@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TabFolio</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #16181c;
+      --bg2:      #1e2128;
+      --bg3:      #262a33;
+      --border:   #2e3340;
+      --text:     #e8eaf0;
+      --muted:    #7a8099;
+      --accent:   #5b8af5;
+      --accent-h: #4a78e8;
+      --danger:   #e05c6a;
+      --green:    #4caf7d;
+      --radius:   8px;
+      --font:     "SF Mono", "Cascadia Code", "Fira Code", ui-monospace, monospace;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      width: 310px;
+      font-size: 12px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 16px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .logo {
+      width: 28px;
+      height: 28px;
+      background: var(--accent);
+      border-radius: 7px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .header-text h1 {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      color: var(--text);
+    }
+    .header-text p {
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.02em;
+    }
+
+    /* ── Sections ── */
+    .section {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .section-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    /* ── Toggle rows ── */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 0;
+    }
+    .toggle-row + .toggle-row {
+      border-top: 1px solid var(--border);
+    }
+    .toggle-info .label {
+      display: block;
+      font-size: 12px;
+      color: var(--text);
+    }
+    .toggle-info .hint {
+      display: block;
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 1px;
+    }
+
+    /* ── Switch ── */
+    .switch {
+      position: relative;
+      width: 34px;
+      height: 20px;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+    .track {
+      position: absolute;
+      inset: 0;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .thumb {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 12px;
+      height: 12px;
+      background: var(--muted);
+      border-radius: 50%;
+      transition: transform 0.15s, background 0.15s;
+    }
+    .switch input:checked ~ .track {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+    .switch input:checked ~ .track .thumb {
+      transform: translateX(14px);
+      background: #fff;
+    }
+
+    /* ── Domain exclusion ── */
+    .domain-list {
+      min-height: 20px;
+      margin-bottom: 8px;
+    }
+    .domain-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 8px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 4px;
+      animation: fadein 0.15s ease;
+    }
+    @keyframes fadein { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+    .domain-name {
+      font-size: 11px;
+      color: var(--text);
+      letter-spacing: 0.01em;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .remove-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 13px;
+      line-height: 1;
+      padding: 0 0 0 8px;
+      flex-shrink: 0;
+      transition: color 0.1s;
+    }
+    .remove-btn:hover { color: var(--danger); }
+    .empty-hint {
+      font-size: 11px;
+      color: var(--muted);
+      padding: 4px 0;
+    }
+
+    /* ── Add domain input row ── */
+    .add-row {
+      display: flex;
+      gap: 6px;
+    }
+    .add-row input {
+      flex: 1;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 11px;
+      padding: 6px 9px;
+      outline: none;
+      transition: border-color 0.1s;
+      min-width: 0;
+    }
+    .add-row input::placeholder { color: var(--muted); }
+    .add-row input:focus { border-color: var(--accent); }
+    .add-row button {
+      background: var(--accent);
+      border: none;
+      border-radius: var(--radius);
+      color: #fff;
+      font-family: var(--font);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 6px 12px;
+      cursor: pointer;
+      transition: background 0.1s;
+      white-space: nowrap;
+    }
+    .add-row button:hover { background: var(--accent-h); }
+
+    /* ── Status badge ── */
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 16px;
+    }
+    .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 5px var(--green);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.4; }
+    }
+    .status-text {
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.03em;
+    }
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+    .chip {
+      font-size: 10px;
+      color: var(--muted);
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 7px;
+      white-space: nowrap;
+      letter-spacing: 0.01em;
+    }
+    .sub-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin: 0 0 6px;
+      opacity: 0.55;
+    }
+    .sub-label + .sub-label { margin-top: 10px; }
+
+    /* ── Subdomain routing examples ── */
+    .routing-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 6px;
+      margin-bottom: 2px;
+    }
+    .routing-table td {
+      font-size: 10px;
+      padding: 3px 0;
+      vertical-align: middle;
+    }
+    .routing-table td:first-child {
+      color: var(--muted);
+      padding-right: 6px;
+      white-space: nowrap;
+    }
+    .routing-table .arrow {
+      color: var(--border);
+      padding: 0 4px;
+    }
+    .routing-table .group-tag {
+      display: inline-block;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 6px;
+      color: var(--accent);
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    /* ── Keyboard shortcut row ── */
+    .shortcut-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 0;
+    }
+    .shortcut-desc {
+      font-size: 11px;
+      color: var(--text);
+    }
+    .shortcut-desc small {
+      display: block;
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 1px;
+    }
+    .kbd-combo {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      flex-shrink: 0;
+    }
+    kbd {
+      display: inline-block;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: var(--font);
+      font-size: 10px;
+      color: var(--accent);
+      line-height: 1.4;
+      white-space: nowrap;
+    }
+    .kbd-sep {
+      font-size: 9px;
+      color: var(--muted);
+    }
+    .shortcut-hint {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 8px;
+      line-height: 1.5;
+    }
+    .shortcut-hint a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .shortcut-hint a:hover { text-decoration: underline; }
+
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="logo">⬡</div>
+    <div class="header-text">
+      <h1>TabFolio</h1>
+      <p>v2.1 — subdomain-aware grouping</p>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Features</div>
+
+    <div class="toggle-row">
+      <div class="toggle-info">
+        <span class="label">Auto-group tabs</span>
+        <span class="hint">Group open tabs by domain</span>
+      </div>
+      <label class="switch" title="Toggle auto-grouping">
+        <input type="checkbox" id="autoGroup">
+        <div class="track"><div class="thumb"></div></div>
+      </label>
+    </div>
+
+    <div class="toggle-row">
+      <div class="toggle-info">
+        <span class="label">Detect duplicates</span>
+        <span class="hint">Mark duplicate tabs with ⚠️</span>
+      </div>
+      <label class="switch" title="Toggle duplicate detection">
+        <input type="checkbox" id="detectDupes">
+        <div class="track"><div class="thumb"></div></div>
+      </label>
+    </div>
+
+    <div class="toggle-row">
+      <div class="toggle-info">
+        <span class="label">Sort groups A–Z</span>
+        <span class="hint">Keep groups in alphabetical order</span>
+      </div>
+      <label class="switch" title="Toggle alphabetical sorting">
+        <input type="checkbox" id="sortAlpha">
+        <div class="track"><div class="thumb"></div></div>
+      </label>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Keyboard shortcuts</div>
+    <div class="shortcut-row">
+      <div class="shortcut-desc">
+        Collapse all groups
+        <small>Folds every group in the current window</small>
+      </div>
+      <div class="kbd-combo" id="shortcutDisplay">
+        <!-- filled by popup.js -->
+        <kbd>Alt</kbd><span class="kbd-sep">+</span><kbd>Shift</kbd><span class="kbd-sep">+</span><kbd>C</kbd>
+      </div>
+    </div>
+    <p class="shortcut-hint">
+      Remapped? Visit
+      <a href="chrome://extensions/shortcuts" id="shortcutLink">chrome://extensions/shortcuts</a>
+      to customise.
+    </p>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Platform domains</div>
+    <p style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.6;">
+      For these domains each product subdomain gets its <em style="color:var(--text)">own</em> group — not one big shared group.
+    </p>
+
+    <!-- Subdomain routing examples -->
+    <table class="routing-table">
+      <tr>
+        <td>docs.google.com</td>
+        <td class="arrow">→</td>
+        <td><span class="group-tag">docs</span></td>
+      </tr>
+      <tr>
+        <td>maps.google.com</td>
+        <td class="arrow">→</td>
+        <td><span class="group-tag">maps</span></td>
+      </tr>
+      <tr>
+        <td>gemini.google.com</td>
+        <td class="arrow">→</td>
+        <td><span class="group-tag">gemini</span></td>
+      </tr>
+      <tr>
+        <td>studio.youtube.com</td>
+        <td class="arrow">→</td>
+        <td><span class="group-tag">studio</span></td>
+      </tr>
+      <tr>
+        <td>gist.github.com</td>
+        <td class="arrow">→</td>
+        <td><span class="group-tag">gist</span></td>
+      </tr>
+      <tr>
+        <td>word.office.com</td>
+        <td class="arrow">→</td>
+        <td><span class="group-tag">word</span></td>
+      </tr>
+    </table>
+
+    <div style="margin:12px 0 8px">
+      <div class="sub-label">Built-in</div>
+      <div class="chip-row" id="builtinChips"></div>
+    </div>
+
+    <div class="sub-label">Custom</div>
+    <div class="domain-list" id="platformList">
+      <span class="empty-hint">No custom platform domains</span>
+    </div>
+    <div class="add-row">
+      <input type="text" id="platformInput" placeholder="mycompany.com" spellcheck="false" autocomplete="off">
+      <button id="addPlatformBtn">Add</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Excluded domains</div>
+    <div class="domain-list" id="domainList">
+      <span class="empty-hint">No excluded domains</span>
+    </div>
+    <div class="add-row">
+      <input type="text" id="domainInput" placeholder="example.com" spellcheck="false" autocomplete="off">
+      <button id="addBtn">Add</button>
+    </div>
+  </div>
+
+  <div class="status-row">
+    <div class="dot"></div>
+    <span class="status-text">Extension active</span>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
