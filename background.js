@@ -330,10 +330,11 @@ async function detectDuplicates() {
 // Respects excludedDomains — both exact and subdomain matches.
 // Not called for non-HTTP tabs (guard kept as safety net only).
 //
-// FIX (v2.1): collapsed defaults to !tab.active instead of !tab.openerTabId.
-//   Previously a manually-typed URL with no openerTabId created a collapsed
-//   group, silently hiding the active tab. Now groups are kept open when the
-//   triggering tab is focused, and collapsed only for background-opened tabs.
+// FIX (v2.2): groups are always created/updated with collapsed: false.
+//   v2.1 used collapsed: !tab.active, which still hid background-opened tabs
+//   (right-click "Open Link in New Tab", Ctrl+click, middle-click) inside a
+//   collapsed group. The fix is unconditional expansion for both new groups
+//   and existing groups that receive a new tab.
 // =============================================================================
 // Returns true if the tab's group assignment was changed (new group created or
 // tab moved into a different group), false if the tab was already in the correct
@@ -372,6 +373,10 @@ async function groupTab(tab) {
       // for a title collision like "docs" from google vs microsoft — acceptable).
       if (tab.groupId !== existing[0].id) {
         await chrome.tabs.group({ groupId: existing[0].id, tabIds: tab.id });
+        // Always expand the group so the newly-added tab is visible — the group
+        // may have been collapsed before this tab arrived (e.g. the user had
+        // folded it, or the group was created for a background tab).
+        await chrome.tabGroups.update(existing[0].id, { collapsed: false });
         return true;  // tab moved into a different group
       }
       return false;  // tab is already in the correct group — nothing changed
@@ -388,10 +393,12 @@ async function groupTab(tab) {
       await chrome.tabGroups.update(groupId, {
         title,
         color:     COLORS[hash % COLORS.length],
-        // FIX: collapse only background tabs (!tab.active), not manually-typed ones.
-        // The old `!tab.openerTabId` collapsed every directly-opened tab, hiding
-        // the active tab inside a collapsed group silently.
-        collapsed: !tab.active,
+        // Always create groups in the expanded state so the triggering tab is
+        // immediately visible, regardless of how it was opened (foreground click,
+        // right-click "Open in New Tab", Ctrl+click, session restore, etc.).
+        // The previous `collapsed: !tab.active` heuristic hid background-opened
+        // tabs inside a collapsed group — the reported bug for context-menu tabs.
+        collapsed: false,
       });
       return true;  // new group created
     }

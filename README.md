@@ -6,15 +6,17 @@
 
 ## Features
 
-| Feature | Details |
-|---|---|
-| **Auto-grouping** | Tabs are grouped by domain the moment they open or navigate |
-| **Subdomain routing** | Platform domains (Google, GitHub, Office 365, …) split into per-product groups — `docs.google.com` → **docs**, `maps.google.com` → **maps** |
-| **Duplicate detection** | Duplicate tabs across any window are flagged with ⚠️ in their title |
-| **Alphabetical sorting** | Groups are kept in A–Z order within each window |
-| **Collapse shortcut** | `Alt+Shift+C` collapses every group in the current window instantly |
-| **Excluded domains** | Any domain can be excluded from grouping via the popup |
-| **Custom platform domains** | Add your own company domains so subdomains get their own group |
+
+| Feature                     | Details                                                                                                                                     |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Auto-grouping**           | Tabs are grouped by domain the moment they open or navigate                                                                                 |
+| **Subdomain routing**       | Platform domains (Google, GitHub, Office 365, …) split into per-product groups — `docs.google.com` → **docs**, `maps.google.com` → **maps** |
+| **Duplicate detection**     | Duplicate tabs across any window are flagged with ⚠️ in their title                                                                         |
+| **Alphabetical sorting**    | Groups are kept in A–Z order within each window                                                                                             |
+| **Collapse shortcut**       | `Alt+Shift+C` collapses every group in the current window instantly                                                                         |
+| **Excluded domains**        | Any domain can be excluded from grouping via the popup                                                                                      |
+| **Custom platform domains** | Add your own company domains so subdomains get their own group                                                                              |
+
 
 ---
 
@@ -59,9 +61,11 @@ Custom platform domains can be added from the popup.
 
 ## Keyboard shortcut
 
-| Shortcut | Action |
-|---|---|
+
+| Shortcut      | Action                                    |
+| ------------- | ----------------------------------------- |
 | `Alt+Shift+C` | Collapse all groups in the current window |
+
 
 To remap, visit `chrome://extensions/shortcuts`.
 
@@ -69,13 +73,15 @@ To remap, visit `chrome://extensions/shortcuts`.
 
 ## Permissions
 
-| Permission | Why |
-|---|---|
-| `tabs` | Read tab URLs to determine grouping |
-| `tabGroups` | Create, update, and move tab groups |
-| `scripting` | Inject the duplicate-title observer into pages |
-| `contextMenus` | Right-click menu for quick exclude / ungroup |
-| `storage` | Persist settings across sessions |
+
+| Permission     | Why                                            |
+| -------------- | ---------------------------------------------- |
+| `tabs`         | Read tab URLs to determine grouping            |
+| `tabGroups`    | Create, update, and move tab groups            |
+| `scripting`    | Inject the duplicate-title observer into pages |
+| `contextMenus` | Right-click menu for quick exclude / ungroup   |
+| `storage`      | Persist settings across sessions               |
+
 
 ---
 
