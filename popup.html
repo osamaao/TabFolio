@@ -352,7 +352,64 @@
     }
     .shortcut-hint a:hover { text-decoration: underline; }
 
-    /* ── Auto-collapse delay sub-row ── */
+    <!-- ── Snapshot manager link button ── -->
+    .open-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      width: 100%;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--accent);
+      font-family: var(--font);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 8px 12px;
+      cursor: pointer;
+      transition: background 0.1s, border-color 0.1s;
+      letter-spacing: 0.02em;
+      margin-top: 10px;
+    }
+    .open-btn:hover { background: var(--bg); border-color: var(--accent); }
+    .open-btn .btn-icon { font-size: 13px; }
+
+    /* ── Number sub-row (reuse delay-row styles) ── */
+    .num-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 0 4px;
+      border-top: 1px solid var(--border);
+      transition: opacity 0.15s;
+    }
+    .num-row.disabled { opacity: 0.4; pointer-events: none; }
+    .num-label { font-size: 11px; color: var(--muted); letter-spacing: 0.01em; }
+    .num-control {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .num-control input[type="number"] {
+      width: 48px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 11px;
+      padding: 4px 6px;
+      text-align: center;
+      outline: none;
+      transition: border-color 0.1s;
+      -webkit-appearance: none;
+      -moz-appearance: textfield;
+    }
+    .num-control input[type="number"]::-webkit-inner-spin-button,
+    .num-control input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
+    .num-control input[type="number"]:focus { border-color: var(--accent); }
+    .num-unit { font-size: 11px; color: var(--muted); }
     .delay-row {
       display: flex;
       align-items: center;
@@ -551,6 +608,41 @@
       <input type="text" id="domainInput" placeholder="example.com" spellcheck="false" autocomplete="off">
       <button id="addBtn">Add</button>
     </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Snapshots</div>
+
+    <div class="toggle-row">
+      <div class="toggle-info">
+        <span class="label">Auto-snapshots</span>
+        <span class="hint">Periodically save all tab groups</span>
+      </div>
+      <label class="switch" title="Toggle auto-snapshots">
+        <input type="checkbox" id="snapshotsEnabled">
+        <div class="track"><div class="thumb"></div></div>
+      </label>
+    </div>
+
+    <div class="num-row" id="snapshotIntervalRow">
+      <span class="num-label">Capture every</span>
+      <div class="num-control">
+        <input type="number" id="snapshotInterval" min="1" max="1440" step="1" value="60">
+        <span class="num-unit">min</span>
+      </div>
+    </div>
+
+    <div class="num-row" id="snapshotMaxRow">
+      <span class="num-label">Keep up to</span>
+      <div class="num-control">
+        <input type="number" id="snapshotMax" min="1" max="200" step="1" value="50">
+        <span class="num-unit">snapshots</span>
+      </div>
+    </div>
+
+    <button class="open-btn" id="openSnapshotsBtn">
+      <span class="btn-icon">◈</span> Open Snapshot Manager
+    </button>
   </div>
 
   <div class="status-row">

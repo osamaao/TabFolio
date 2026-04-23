@@ -23,6 +23,10 @@ const DEFAULT_SETTINGS = {
   platformDomains:    [],   // user additions; BUILTIN_PLATFORM_DOMAINS always active
   autoCollapse:       true,  // auto-collapse idle groups (on by default)
   autoCollapseDelay:  5,     // minutes of inactivity before collapsing
+  // ── Snapshots ──────────────────────────────────────────────────────────────
+  snapshotsEnabled:   true,  // periodically persist all tab-group state
+  snapshotInterval:   60,    // minutes between automatic snapshots
+  snapshotMax:        50,    // rolling buffer size (FIFO)
 };
 
 async function getSettings() {
@@ -504,6 +508,7 @@ chrome.commands.onCommand.addListener(async (command) => {
 // =============================================================================
 
 const AUTO_COLLAPSE_ALARM = "tabfolio-auto-collapse";
+const SNAPSHOT_ALARM      = "tabfolio-snapshot";
 
 // Write the current timestamp for groupId into local storage.
 async function touchGroup(groupId) {
@@ -601,6 +606,7 @@ function setupAutoCollapseAlarm() {
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === AUTO_COLLAPSE_ALARM) autoCollapseIdleGroups();
+  if (alarm.name === SNAPSHOT_ALARM)      captureSnapshot();
 });
 
 // Touch a group whenever the user switches to a tab inside it.
@@ -624,6 +630,160 @@ chrome.tabGroups.onUpdated.addListener(async (group) => {
     await touchGroup(group.id);
   }
 });
+
+// =============================================================================
+// Tab Auto-Snapshots
+//
+// Strategy:
+//   • A chrome.alarms alarm fires at the user-configured interval (default 60 min)
+//     and calls captureSnapshot().  The alarm survives service-worker suspension.
+//   • Snapshots are stored in chrome.storage.local (not sync — tab data is
+//     device-local and can be large).
+//   • Storage key: "snapshots" → Array of snapshot objects, newest-first.
+//   • Retention: rolling buffer capped at snapshotMax (default 50).
+//     When the buffer is full the oldest entry is dropped (FIFO).
+//   • Naming: "tabfolio-snapshot-YYYY-MM-DD-<unix-ms>"
+//   • Restore: opens all groups from the snapshot into a fresh window so the
+//     current session is never disturbed.
+// =============================================================================
+
+// Capture the current state of every tab group across all windows.
+async function captureSnapshot() {
+  const settings = await getSettings();
+  if (!settings.snapshotsEnabled) return;
+
+  const now     = Date.now();
+  const dateStr = new Date(now).toISOString().slice(0, 10); // YYYY-MM-DD
+  const name    = `tabfolio-snapshot-${dateStr}-${now}`;
+
+  let groups;
+  try {
+    groups = await chrome.tabGroups.query({});
+  } catch (err) {
+    console.warn("[TabFolio] captureSnapshot – tabGroups.query failed:", err);
+    return;
+  }
+
+  if (groups.length === 0) {
+    console.log("[TabFolio] captureSnapshot – no groups to capture, skipping.");
+    return;
+  }
+
+  const groupData = [];
+  for (const group of groups) {
+    let tabs;
+    try {
+      tabs = await chrome.tabs.query({ groupId: group.id });
+    } catch (err) {
+      console.warn("[TabFolio] captureSnapshot – tabs.query failed for group", group.id, err);
+      continue;
+    }
+    groupData.push({
+      title:     group.title     ?? "",
+      color:     group.color     ?? "grey",
+      collapsed: group.collapsed ?? false,
+      windowId:  group.windowId,
+      tabs: tabs.map((t) => ({
+        url:        t.url        ?? "",
+        title:      t.title      ?? "",
+        favIconUrl: t.favIconUrl ?? "",
+      })),
+    });
+  }
+
+  const snapshot = {
+    id:        now,
+    name,
+    timestamp: now,
+    groups:    groupData,
+  };
+
+  // Load, prepend, and trim to the rolling max.
+  const store     = await chrome.storage.local.get({ snapshots: [] });
+  let   snapshots = [snapshot, ...store.snapshots];
+  const max       = Math.max(1, settings.snapshotMax || 50);
+  if (snapshots.length > max) snapshots = snapshots.slice(0, max); // drop oldest (tail)
+  await chrome.storage.local.set({ snapshots });
+
+  const tabCount = groupData.reduce((n, g) => n + g.tabs.length, 0);
+  console.log(
+    `[TabFolio] Snapshot captured: ${name}`,
+    `(${groupData.length} groups, ${tabCount} tabs, buffer: ${snapshots.length}/${max})`
+  );
+}
+
+// Restore a snapshot by opening all its groups in a new window.
+// The current window / session is left completely untouched.
+async function restoreSnapshot(snapshot) {
+  if (!snapshot?.groups?.length) {
+    return { success: false, error: "Snapshot contains no groups." };
+  }
+
+  // Flatten to HTTP/HTTPS tabs only so we never attempt to open chrome:// URLs.
+  const httpGroups = snapshot.groups
+    .map((g) => ({
+      ...g,
+      tabs: g.tabs.filter((t) => t.url?.startsWith("http")),
+    }))
+    .filter((g) => g.tabs.length > 0);
+
+  if (httpGroups.length === 0) {
+    return { success: false, error: "No restorable tabs found in snapshot." };
+  }
+
+  try {
+    // Open a new window — Chrome always gives it one blank tab.
+    const newWindow       = await chrome.windows.create({ focused: true });
+    const placeholderTabId = newWindow.tabs[0].id;
+
+    for (const groupData of httpGroups) {
+      const tabIds = [];
+      for (const tabInfo of groupData.tabs) {
+        const tab = await chrome.tabs.create({
+          windowId: newWindow.id,
+          url:      tabInfo.url,
+          active:   false,
+        });
+        tabIds.push(tab.id);
+      }
+      const groupId = await chrome.tabs.group({
+        tabIds,
+        createProperties: { windowId: newWindow.id },
+      });
+      await chrome.tabGroups.update(groupId, {
+        title:     groupData.title,
+        color:     groupData.color,
+        collapsed: groupData.collapsed,
+      });
+    }
+
+    // Remove the placeholder blank tab Chrome created with the window.
+    try { await chrome.tabs.remove(placeholderTabId); } catch { /* benign */ }
+
+    return { success: true };
+  } catch (err) {
+    console.error("[TabFolio] restoreSnapshot failed:", err);
+    return { success: false, error: err.message };
+  }
+}
+
+// Create (or recreate) the snapshot alarm with the current interval setting.
+// Safe to call multiple times — if the interval hasn't changed we leave the
+// existing alarm in place so we don't reset its countdown unnecessarily.
+function setupSnapshotAlarm() {
+  getSettings().then((settings) => {
+    if (!settings.snapshotsEnabled) {
+      chrome.alarms.clear(SNAPSHOT_ALARM);
+      return;
+    }
+    const interval = Math.max(1, settings.snapshotInterval || 60);
+    chrome.alarms.get(SNAPSHOT_ALARM, (existing) => {
+      // Only recreate if the period has meaningfully changed (±1 s tolerance).
+      if (existing && Math.abs(existing.periodInMinutes - interval) < 0.02) return;
+      chrome.alarms.create(SNAPSHOT_ALARM, { periodInMinutes: interval });
+    });
+  });
+}
 
 // =============================================================================
 // Context menus
@@ -728,6 +888,7 @@ chrome.tabs.onRemoved.addListener(() => {
 chrome.runtime.onInstalled.addListener(async () => {
   setupContextMenus();
   setupAutoCollapseAlarm();
+  setupSnapshotAlarm();
 
   let tabs;
   try {
@@ -768,6 +929,7 @@ chrome.runtime.onInstalled.addListener(async () => {
 chrome.runtime.onStartup.addListener(() => {
   setupContextMenus();
   setupAutoCollapseAlarm();
+  setupSnapshotAlarm();
 
   // Give Chrome ~2 s to finish restoring the session, then do a full pass.
   setTimeout(async () => {
@@ -789,4 +951,34 @@ chrome.runtime.onStartup.addListener(() => {
 
     await detectDuplicates();
   }, 2000);
+});
+
+// =============================================================================
+// Message listener — snapshot management page ↔ background
+//
+// Supported actions:
+//   captureNow          → trigger an immediate snapshot
+//   restoreSnapshot     → restore a snapshot into a new window
+//   updateSnapshotAlarm → recreate the alarm after the user changes the interval
+// =============================================================================
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.action === "captureNow") {
+    captureSnapshot().then(() => sendResponse({ success: true })).catch((err) => {
+      console.error("[TabFolio] captureNow failed:", err);
+      sendResponse({ success: false, error: err.message });
+    });
+    return true; // async
+  }
+
+  if (message.action === "restoreSnapshot") {
+    restoreSnapshot(message.snapshot)
+      .then(sendResponse)
+      .catch((err) => sendResponse({ success: false, error: err.message }));
+    return true; // async
+  }
+
+  if (message.action === "updateSnapshotAlarm") {
+    setupSnapshotAlarm();
+    sendResponse({ success: true });
+  }
 });
