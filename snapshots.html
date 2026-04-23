@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TabFolio — Snapshots</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        rgb(248, 248, 246);
+      --bg2:       #ffffff;
+      --bg3:       #f0f0ee;
+      --bg4:       #e8e8e5;
+      --border:    #ddddd9;
+      --border-hi: #c4c4be;
+      --text:      #1a1a18;
+      --muted:     #6b6b65;
+      --muted2:    #9b9b94;
+      --accent:    #3b6ef0;
+      --accent-h:  #2a5de0;
+      --accent-dim:#e8eefb;
+      --danger:    #d03040;
+      --danger-dim:#fceef0;
+      --green:     #2a9d60;
+      --green-dim: #e8f5ee;
+      --orange:    #c96a1a;
+      --radius:    8px;
+      --radius-lg: 12px;
+      --font:      "SF Mono", "Cascadia Code", "Fira Code", ui-monospace, monospace;
+    }
+
+    html, body {
+      height: 100%;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 12px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+    }
+
+    /* ── Layout ── */
+    .layout {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      grid-template-rows: 56px 1fr;
+      min-height: 100vh;
+    }
+
+    /* ── Top bar ── */
+    .topbar {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 0 24px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg2);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .logo {
+      width: 30px;
+      height: 30px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+    .topbar-title {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      color: var(--text);
+    }
+    .topbar-sub {
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      margin-left: 2px;
+    }
+    .topbar-sep {
+      flex: 1;
+    }
+    .topbar-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: none;
+      border-radius: var(--radius);
+      font-family: var(--font);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 7px 14px;
+      cursor: pointer;
+      letter-spacing: 0.02em;
+      transition: background 0.12s, opacity 0.12s;
+      white-space: nowrap;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+    .btn-primary:hover { background: var(--accent-h); }
+    .btn-ghost {
+      background: var(--bg3);
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { color: var(--text); border-color: var(--border-hi); }
+    .btn:disabled { opacity: 0.45; pointer-events: none; }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      border-right: 1px solid var(--border);
+      background: var(--bg2);
+      padding: 20px 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .sidebar-section-label {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted2);
+      margin-bottom: 8px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .stat-card {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 10px 8px;
+    }
+    .stat-value {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.02em;
+      line-height: 1;
+    }
+    .stat-label {
+      font-size: 9px;
+      color: var(--muted);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+    .stat-card.accent .stat-value { color: var(--accent); }
+    .stat-card.green  .stat-value { color: var(--green); }
+
+    /* Buffer bar */
+    .buffer-bar-wrap {
+      margin-top: 4px;
+    }
+    .buffer-bar-track {
+      height: 4px;
+      background: var(--bg3);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 6px;
+      border: 1px solid var(--border);
+    }
+    .buffer-bar-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+      transition: width 0.4s ease;
+    }
+    .buffer-bar-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 9px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    /* Settings summary */
+    .settings-summary {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .settings-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 10px;
+    }
+    .settings-row:last-child { border-bottom: none; }
+    .settings-row-label { color: var(--muted); }
+    .settings-row-val   { color: var(--text); font-weight: 600; }
+
+    /* ── Main content ── */
+    .main {
+      padding: 24px 28px;
+      overflow-y: auto;
+    }
+
+    /* ── Empty state ── */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 300px;
+      gap: 12px;
+      text-align: center;
+    }
+    .empty-icon {
+      font-size: 40px;
+      opacity: 0.25;
+    }
+    .empty-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    .empty-hint {
+      font-size: 11px;
+      color: var(--muted2);
+      max-width: 300px;
+      line-height: 1.7;
+    }
+
+    /* ── Snapshot list ── */
+    .snapshot-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    /* ── Snapshot card ── */
+    .snapshot-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      transition: border-color 0.12s;
+      animation: cardIn 0.18s ease both;
+    }
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: none; }
+    }
+    .snapshot-card:hover { border-color: var(--border-hi); }
+    .snapshot-card.restoring { border-color: var(--accent); }
+    .snapshot-card.restored  { border-color: var(--green); }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .card-header:hover { background: var(--bg3); }
+
+    .card-index {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--muted2);
+      width: 22px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    .card-meta {
+      flex: 1;
+      min-width: 0;
+    }
+    .card-name {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: 0.01em;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .card-time {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 1px;
+    }
+
+    .card-chips {
+      display: flex;
+      gap: 5px;
+      flex-shrink: 0;
+    }
+    .chip {
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      padding: 2px 7px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+    .chip-groups {
+      background: var(--accent-dim);
+      color: var(--accent);
+      border: 1px solid #c0cff8;
+    }
+    .chip-tabs {
+      background: var(--bg4);
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+
+    .card-chevron {
+      font-size: 10px;
+      color: var(--muted2);
+      flex-shrink: 0;
+      transition: transform 0.15s;
+    }
+    .snapshot-card.open .card-chevron { transform: rotate(90deg); }
+
+    .card-actions {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .card-btn {
+      border: none;
+      border-radius: 6px;
+      font-family: var(--font);
+      font-size: 10px;
+      font-weight: 600;
+      padding: 5px 10px;
+      cursor: pointer;
+      transition: background 0.1s, color 0.1s;
+      letter-spacing: 0.02em;
+    }
+    .card-btn-restore {
+      background: var(--accent-dim);
+      color: var(--accent);
+      border: 1px solid #c0cff8;
+    }
+    .card-btn-restore:hover { background: var(--accent); color: #fff; }
+    .card-btn-delete {
+      background: transparent;
+      color: var(--muted2);
+      border: 1px solid transparent;
+    }
+    .card-btn-delete:hover { background: var(--danger-dim); color: var(--danger); border-color: #f0c0c4; }
+
+    /* ── Card body (expandable) ── */
+    .card-body {
+      display: none;
+      border-top: 1px solid var(--border);
+      padding: 0;
+    }
+    .snapshot-card.open .card-body { display: block; }
+
+    .group-list {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .group-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .group-row:last-child { border-bottom: none; }
+
+    .group-color-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 4px;
+    }
+    /* Chrome group colors */
+    .gc-grey   { background: #8e8e93; }
+    .gc-blue   { background: #0a84ff; }
+    .gc-red    { background: #ff453a; }
+    .gc-yellow { background: #ffd60a; }
+    .gc-green  { background: #30d158; }
+    .gc-pink   { background: #ff6cce; }
+    .gc-purple { background: #bf5af2; }
+    .gc-cyan   { background: #32ade6; }
+    .gc-orange { background: #ff9f0a; }
+
+    .group-info { flex: 1; min-width: 0; }
+    .group-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .group-collapsed-badge {
+      font-size: 8px;
+      color: var(--muted2);
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 1px 5px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .group-tabs {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      margin-top: 6px;
+    }
+    .group-tab-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 2px 0;
+    }
+    .tab-favicon {
+      width: 12px;
+      height: 12px;
+      flex-shrink: 0;
+      border-radius: 2px;
+      object-fit: contain;
+    }
+    .tab-favicon-placeholder {
+      width: 12px;
+      height: 12px;
+      background: var(--bg3);
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+    .tab-title {
+      font-size: 10px;
+      color: var(--muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+    .tab-url {
+      font-size: 9px;
+      color: var(--muted2);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 220px;
+      flex-shrink: 0;
+    }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--bg3);
+      border: 1px solid var(--border-hi);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-size: 11px;
+      padding: 10px 16px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+      z-index: 100;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.2s, transform 0.2s;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      max-width: 340px;
+    }
+    #toast.show {
+      opacity: 1;
+      transform: none;
+    }
+    #toast.success { border-color: var(--green); }
+    #toast.error   { border-color: var(--danger); }
+    .toast-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    #toast.success .toast-dot { background: var(--green); }
+    #toast.error   .toast-dot { background: var(--danger); }
+
+    /* ── Loading state ── */
+    .loading-shimmer {
+      background: linear-gradient(90deg, var(--bg2) 25%, var(--bg3) 50%, var(--bg2) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+      border-radius: var(--radius);
+      height: 64px;
+    }
+    @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--border-hi); }
+  </style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- Top bar -->
+  <header class="topbar">
+    <div class="logo">⬡</div>
+    <div>
+      <div class="topbar-title">TabFolio</div>
+    </div>
+    <span class="topbar-sub">/ snapshots</span>
+    <div class="topbar-sep"></div>
+    <div class="topbar-actions">
+      <button class="btn btn-ghost" id="clearAllBtn">✕ Clear all</button>
+      <button class="btn btn-primary" id="captureNowBtn">◈ Take snapshot</button>
+    </div>
+  </header>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div>
+      <div class="sidebar-section-label">Overview</div>
+      <div class="stats-grid">
+        <div class="stat-card accent">
+          <div class="stat-value" id="statCount">–</div>
+          <div class="stat-label">snapshots</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statGroups">–</div>
+          <div class="stat-label">groups total</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statTabs">–</div>
+          <div class="stat-label">tabs total</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-value" id="statLatest">–</div>
+          <div class="stat-label">latest</div>
+        </div>
+      </div>
+
+      <div class="buffer-bar-wrap" style="margin-top:12px;">
+        <div class="sidebar-section-label">Buffer usage</div>
+        <div class="buffer-bar-track">
+          <div class="buffer-bar-fill" id="bufferFill" style="width:0%"></div>
+        </div>
+        <div class="buffer-bar-label">
+          <span id="bufferUsed">0 used</span>
+          <span id="bufferMax">/ 50 max</span>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="sidebar-section-label">Settings</div>
+      <div class="settings-summary" id="settingsSummary">
+        <div class="settings-row">
+          <span class="settings-row-label">Auto-capture</span>
+          <span class="settings-row-val" id="sEnabled">–</span>
+        </div>
+        <div class="settings-row">
+          <span class="settings-row-label">Interval</span>
+          <span class="settings-row-val" id="sInterval">–</span>
+        </div>
+        <div class="settings-row">
+          <span class="settings-row-label">Max snapshots</span>
+          <span class="settings-row-val" id="sMax">–</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="main" id="main">
+    <!-- filled by snapshots.js -->
+  </main>
+
+</div>
+
+<!-- Toast -->
+<div id="toast"><span class="toast-dot"></span><span id="toastText"></span></div>
+
+<script src="snapshots.js"></script>
+</body>
+</html>

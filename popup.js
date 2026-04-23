@@ -32,6 +32,9 @@ const DEFAULT_SETTINGS = {
   platformDomains:    [],
   autoCollapse:       true,
   autoCollapseDelay:  5,
+  snapshotsEnabled:   true,
+  snapshotInterval:   60,
+  snapshotMax:        50,
 };
 
 // ── Storage helpers ──────────────────────────────────────────────────────────
@@ -244,6 +247,42 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("shortcutLink").addEventListener("click", (e) => {
     e.preventDefault();
     navigator.clipboard?.writeText("chrome://extensions/shortcuts").catch(() => {});
+  });
+
+  // ── Snapshot settings ────────────────────────────────────────────────────
+  function setSnapshotRowsEnabled(enabled) {
+    document.getElementById("snapshotIntervalRow").classList.toggle("disabled", !enabled);
+    document.getElementById("snapshotMaxRow").classList.toggle("disabled", !enabled);
+  }
+
+  const snapshotsEnabledEl = document.getElementById("snapshotsEnabled");
+  snapshotsEnabledEl.checked = settings.snapshotsEnabled ?? true;
+  setSnapshotRowsEnabled(snapshotsEnabledEl.checked);
+  snapshotsEnabledEl.addEventListener("change", (e) => {
+    savePatch({ snapshotsEnabled: e.target.checked });
+    setSnapshotRowsEnabled(e.target.checked);
+    chrome.runtime.sendMessage({ action: "updateSnapshotAlarm" });
+  });
+
+  const snapshotIntervalEl = document.getElementById("snapshotInterval");
+  snapshotIntervalEl.value = settings.snapshotInterval ?? 60;
+  snapshotIntervalEl.addEventListener("change", () => {
+    const val = Math.min(1440, Math.max(1, parseInt(snapshotIntervalEl.value, 10) || 60));
+    snapshotIntervalEl.value = val;
+    savePatch({ snapshotInterval: val });
+    chrome.runtime.sendMessage({ action: "updateSnapshotAlarm" });
+  });
+
+  const snapshotMaxEl = document.getElementById("snapshotMax");
+  snapshotMaxEl.value = settings.snapshotMax ?? 50;
+  snapshotMaxEl.addEventListener("change", () => {
+    const val = Math.min(200, Math.max(1, parseInt(snapshotMaxEl.value, 10) || 50));
+    snapshotMaxEl.value = val;
+    savePatch({ snapshotMax: val });
+  });
+
+  document.getElementById("openSnapshotsBtn").addEventListener("click", () => {
+    chrome.tabs.create({ url: chrome.runtime.getURL("snapshots.html") });
   });
 
   // Render platform domains
