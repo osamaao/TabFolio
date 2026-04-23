@@ -1,5 +1,5 @@
 // =============================================================================
-// TabFolio — background.js  v2.1
+// TabFolio — background.js  v2.2
 // =============================================================================
 
 const DUPE_ICON  = "⚠️ ";
@@ -16,11 +16,13 @@ const TRACKING_PARAMS = new Set([
 // Settings helpers
 // =============================================================================
 const DEFAULT_SETTINGS = {
-  autoGroup:       true,
-  detectDupes:     true,
-  sortAlpha:       true,
-  excludedDomains: [],   // e.g. ["localhost", "internal.corp"]
-  platformDomains: [],   // user additions; BUILTIN_PLATFORM_DOMAINS always active
+  autoGroup:          true,
+  detectDupes:        true,
+  sortAlpha:          true,
+  excludedDomains:    [],   // e.g. ["localhost", "internal.corp"]
+  platformDomains:    [],   // user additions; BUILTIN_PLATFORM_DOMAINS always active
+  autoCollapse:       true,  // auto-collapse idle groups (on by default)
+  autoCollapseDelay:  5,     // minutes of inactivity before collapsing
 };
 
 async function getSettings() {
@@ -330,11 +332,10 @@ async function detectDuplicates() {
 // Respects excludedDomains — both exact and subdomain matches.
 // Not called for non-HTTP tabs (guard kept as safety net only).
 //
-// FIX (v2.2): groups are always created/updated with collapsed: false.
-//   v2.1 used collapsed: !tab.active, which still hid background-opened tabs
-//   (right-click "Open Link in New Tab", Ctrl+click, middle-click) inside a
-//   collapsed group. The fix is unconditional expansion for both new groups
-//   and existing groups that receive a new tab.
+// FIX (v2.1): collapsed defaults to !tab.active instead of !tab.openerTabId.
+//   Previously a manually-typed URL with no openerTabId created a collapsed
+//   group, silently hiding the active tab. Now groups are kept open when the
+//   triggering tab is focused, and collapsed only for background-opened tabs.
 // =============================================================================
 // Returns true if the tab's group assignment was changed (new group created or
 // tab moved into a different group), false if the tab was already in the correct
@@ -373,10 +374,6 @@ async function groupTab(tab) {
       // for a title collision like "docs" from google vs microsoft — acceptable).
       if (tab.groupId !== existing[0].id) {
         await chrome.tabs.group({ groupId: existing[0].id, tabIds: tab.id });
-        // Always expand the group so the newly-added tab is visible — the group
-        // may have been collapsed before this tab arrived (e.g. the user had
-        // folded it, or the group was created for a background tab).
-        await chrome.tabGroups.update(existing[0].id, { collapsed: false });
         return true;  // tab moved into a different group
       }
       return false;  // tab is already in the correct group — nothing changed
@@ -393,12 +390,10 @@ async function groupTab(tab) {
       await chrome.tabGroups.update(groupId, {
         title,
         color:     COLORS[hash % COLORS.length],
-        // Always create groups in the expanded state so the triggering tab is
-        // immediately visible, regardless of how it was opened (foreground click,
-        // right-click "Open in New Tab", Ctrl+click, session restore, etc.).
-        // The previous `collapsed: !tab.active` heuristic hid background-opened
-        // tabs inside a collapsed group — the reported bug for context-menu tabs.
-        collapsed: false,
+        // FIX: collapse only background tabs (!tab.active), not manually-typed ones.
+        // The old `!tab.openerTabId` collapsed every directly-opened tab, hiding
+        // the active tab inside a collapsed group silently.
+        collapsed: !tab.active,
       });
       return true;  // new group created
     }
@@ -488,6 +483,146 @@ chrome.commands.onCommand.addListener(async (command) => {
     return;
   }
   await collapseAllGroups(win.id);
+});
+
+// =============================================================================
+// Auto-collapse idle groups
+//
+// Strategy:
+//   • Activity timestamps are stored in chrome.storage.local (device-local;
+//     group IDs are ephemeral and meaningless across devices).
+//   • A chrome.alarms alarm fires every minute to check for idle groups.
+//     chrome.alarms survive service-worker suspension; setTimeout does not.
+//   • "Touching" a group resets its idle timer.  Triggers:
+//       – tabs.onActivated   : user switched to a tab inside the group
+//       – tabGroups.onUpdated (collapsed → false) : user manually expanded it,
+//         or groupTab() just added a tab and expanded it
+//   • The active-tab group (in any open window) is NEVER auto-collapsed so
+//     the user's current context is never hidden.
+//   • First time a group is seen (no stored timestamp), its timer is
+//     initialised to now — giving it a full grace period before any collapse.
+// =============================================================================
+
+const AUTO_COLLAPSE_ALARM = "tabfolio-auto-collapse";
+
+// Write the current timestamp for groupId into local storage.
+async function touchGroup(groupId) {
+  if (!groupId || groupId === -1) return;
+  try {
+    const store    = await chrome.storage.local.get({ groupActivity: {} });
+    const activity = store.groupActivity;
+    activity[String(groupId)] = Date.now();
+    await chrome.storage.local.set({ groupActivity: activity });
+  } catch (err) {
+    console.debug("[TabFolio] touchGroup – storage error:", err.message);
+  }
+}
+
+// Called once per alarm tick.  Collapses every expanded group whose idle time
+// exceeds the configured threshold, except the group containing the active tab
+// in each window.
+async function autoCollapseIdleGroups() {
+  const settings = await getSettings();
+  if (!settings.autoCollapse) return;
+
+  const delayMs = Math.max(1, settings.autoCollapseDelay || 5) * 60 * 1000;
+  const now     = Date.now();
+
+  // Collect the group ID of the active tab in every window so we never
+  // collapse the group the user is currently looking at.
+  let activeTabs;
+  try {
+    activeTabs = await chrome.tabs.query({ active: true });
+  } catch (err) {
+    console.warn("[TabFolio] autoCollapse – tabs.query failed:", err);
+    return;
+  }
+  const activeGroupIds = new Set(
+    activeTabs.map((t) => t.groupId).filter((id) => id !== -1)
+  );
+
+  let groups;
+  try {
+    groups = await chrome.tabGroups.query({});
+  } catch (err) {
+    console.warn("[TabFolio] autoCollapse – tabGroups.query failed:", err);
+    return;
+  }
+
+  const store    = await chrome.storage.local.get({ groupActivity: {} });
+  const activity = store.groupActivity;
+  let   dirty    = false;
+
+  for (const group of groups) {
+    if (group.collapsed)              continue; // already collapsed, nothing to do
+    if (activeGroupIds.has(group.id)) continue; // never hide the active-tab group
+
+    const key       = String(group.id);
+    const lastTouch = activity[key];
+
+    if (lastTouch === undefined) {
+      // First encounter — initialise the timer and give a full grace period.
+      activity[key] = now;
+      dirty = true;
+      continue;
+    }
+
+    if (now - lastTouch >= delayMs) {
+      try {
+        await chrome.tabGroups.update(group.id, { collapsed: true });
+      } catch (err) {
+        // Group may have been removed between query and update — benign.
+        console.debug("[TabFolio] autoCollapse – skipped group", group.id, err.message);
+      }
+    }
+  }
+
+  // Prune stale timestamps for groups that no longer exist so local storage
+  // doesn't accumulate orphaned entries across long browsing sessions.
+  const liveIds = new Set(groups.map((g) => String(g.id)));
+  for (const id of Object.keys(activity)) {
+    if (!liveIds.has(id)) { delete activity[id]; dirty = true; }
+  }
+
+  if (dirty) await chrome.storage.local.set({ groupActivity: activity });
+}
+
+// Ensure the recurring alarm exists.  Safe to call multiple times — if the
+// alarm already exists, chrome.alarms.create replaces it without side-effects.
+function setupAutoCollapseAlarm() {
+  chrome.alarms.get(AUTO_COLLAPSE_ALARM, (existing) => {
+    if (!existing) {
+      // 1-minute period: the minimum Chrome allows.  Worst-case the group is
+      // collapsed up to 1 min later than the user's configured threshold.
+      chrome.alarms.create(AUTO_COLLAPSE_ALARM, { periodInMinutes: 1 });
+    }
+  });
+}
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === AUTO_COLLAPSE_ALARM) autoCollapseIdleGroups();
+});
+
+// Touch a group whenever the user switches to a tab inside it.
+chrome.tabs.onActivated.addListener(async ({ tabId }) => {
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    if (tab.groupId && tab.groupId !== -1) {
+      await touchGroup(tab.groupId);
+    }
+  } catch (err) {
+    console.debug("[TabFolio] onActivated – tab fetch failed:", err.message);
+  }
+});
+
+// Touch a group whenever it becomes expanded — either by the user clicking the
+// group header or by groupTab() explicitly setting collapsed: false.
+// Collapses (collapsed: true) are intentionally ignored so auto-collapse and
+// collapseAllGroups do not reset the timer they just acted on.
+chrome.tabGroups.onUpdated.addListener(async (group) => {
+  if (!group.collapsed) {
+    await touchGroup(group.id);
+  }
 });
 
 // =============================================================================
@@ -592,6 +727,7 @@ chrome.tabs.onRemoved.addListener(() => {
 // --- 4. Startup tidy on install / update ---
 chrome.runtime.onInstalled.addListener(async () => {
   setupContextMenus();
+  setupAutoCollapseAlarm();
 
   let tabs;
   try {
@@ -631,6 +767,7 @@ chrome.runtime.onInstalled.addListener(async () => {
 // =============================================================================
 chrome.runtime.onStartup.addListener(() => {
   setupContextMenus();
+  setupAutoCollapseAlarm();
 
   // Give Chrome ~2 s to finish restoring the session, then do a full pass.
   setTimeout(async () => {

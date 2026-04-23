@@ -1,4 +1,4 @@
-// popup.js  v2.1
+// popup.js  v2.2
 
 // Must stay in sync with BUILTIN_PLATFORM_DOMAINS in background.js.
 // These are the domains where the *subdomain* is used as the group name:
@@ -25,11 +25,13 @@ const BUILTIN_PLATFORM_DOMAINS = [
 ];
 
 const DEFAULT_SETTINGS = {
-  autoGroup:       true,
-  detectDupes:     true,
-  sortAlpha:       true,
-  excludedDomains: [],
-  platformDomains: [],
+  autoGroup:          true,
+  detectDupes:        true,
+  sortAlpha:          true,
+  excludedDomains:    [],
+  platformDomains:    [],
+  autoCollapse:       true,
+  autoCollapseDelay:  5,
 };
 
 // ── Storage helpers ──────────────────────────────────────────────────────────
@@ -194,6 +196,28 @@ document.addEventListener("DOMContentLoaded", async () => {
     el.checked = settings[key];
     el.addEventListener("change", (e) => savePatch({ [key]: e.target.checked }));
   }
+
+  // ── Auto-collapse toggle + delay sub-row ─────────────────────────────────
+  function setDelayRowEnabled(enabled) {
+    document.getElementById("autoCollapseDelayRow")
+      .classList.toggle("disabled", !enabled);
+  }
+
+  const autoCollapseEl = document.getElementById("autoCollapse");
+  autoCollapseEl.checked = settings.autoCollapse;
+  setDelayRowEnabled(settings.autoCollapse);
+  autoCollapseEl.addEventListener("change", (e) => {
+    savePatch({ autoCollapse: e.target.checked });
+    setDelayRowEnabled(e.target.checked);
+  });
+
+  const delayEl = document.getElementById("autoCollapseDelay");
+  delayEl.value = settings.autoCollapseDelay ?? 5;
+  delayEl.addEventListener("change", () => {
+    const val = Math.min(60, Math.max(1, parseInt(delayEl.value, 10) || 5));
+    delayEl.value = val;
+    savePatch({ autoCollapseDelay: val });
+  });
 
   // ── Keyboard shortcut display ─────────────────────────────────────────────
   // Read the live binding so the displayed keys stay correct after the user
