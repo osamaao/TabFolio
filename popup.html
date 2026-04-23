@@ -352,6 +352,54 @@
     }
     .shortcut-hint a:hover { text-decoration: underline; }
 
+    /* ── Auto-collapse delay sub-row ── */
+    .delay-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 0 4px;
+      border-top: 1px solid var(--border);
+      transition: opacity 0.15s;
+    }
+    .delay-row.disabled {
+      opacity: 0.4;
+      pointer-events: none;
+    }
+    .delay-label {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.01em;
+    }
+    .delay-control {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .delay-control input[type="number"] {
+      width: 42px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 11px;
+      padding: 4px 6px;
+      text-align: center;
+      outline: none;
+      transition: border-color 0.1s;
+      -webkit-appearance: none;
+      -moz-appearance: textfield;
+    }
+    .delay-control input[type="number"]::-webkit-inner-spin-button,
+    .delay-control input[type="number"]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+    }
+    .delay-control input[type="number"]:focus { border-color: var(--accent); }
+    .delay-unit {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
   </style>
 </head>
 <body>
@@ -398,6 +446,25 @@
         <input type="checkbox" id="sortAlpha">
         <div class="track"><div class="thumb"></div></div>
       </label>
+    </div>
+
+    <div class="toggle-row">
+      <div class="toggle-info">
+        <span class="label">Auto-collapse idle groups</span>
+        <span class="hint">Fold groups you haven't visited recently</span>
+      </div>
+      <label class="switch" title="Toggle auto-collapse">
+        <input type="checkbox" id="autoCollapse">
+        <div class="track"><div class="thumb"></div></div>
+      </label>
+    </div>
+
+    <div class="delay-row" id="autoCollapseDelayRow">
+      <span class="delay-label">Collapse after</span>
+      <div class="delay-control">
+        <input type="number" id="autoCollapseDelay" min="1" max="60" step="1" value="5">
+        <span class="delay-unit">min</span>
+      </div>
     </div>
   </div>
 

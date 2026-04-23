@@ -9,7 +9,8 @@
     "tabGroups",
     "scripting",
     "contextMenus",
-    "storage"
+    "storage",
+    "alarms"
   ],
   "host_permissions": [
     "http://*/*",
