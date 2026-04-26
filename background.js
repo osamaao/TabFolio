@@ -198,6 +198,10 @@ function debounce(key, fn, delayMs) {
   }, delayMs));
 }
 
+function errorMessage(err) {
+  return err?.message ?? String(err);
+}
+
 // =============================================================================
 // Per-window serialization queue for groupTab calls
 //
@@ -649,67 +653,75 @@ chrome.tabGroups.onUpdated.addListener(async (group) => {
 
 // Capture the current state of every tab group across all windows.
 async function captureSnapshot() {
-  const settings = await getSettings();
-  if (!settings.snapshotsEnabled) return;
-
-  const now     = Date.now();
-  const dateStr = new Date(now).toISOString().slice(0, 10); // YYYY-MM-DD
-  const name    = `tabfolio-snapshot-${dateStr}-${now}`;
-
-  let groups;
   try {
-    groups = await chrome.tabGroups.query({});
-  } catch (err) {
-    console.warn("[TabFolio] captureSnapshot – tabGroups.query failed:", err);
-    return;
-  }
-
-  if (groups.length === 0) {
-    console.log("[TabFolio] captureSnapshot – no groups to capture, skipping.");
-    return;
-  }
-
-  const groupData = [];
-  for (const group of groups) {
-    let tabs;
-    try {
-      tabs = await chrome.tabs.query({ groupId: group.id });
-    } catch (err) {
-      console.warn("[TabFolio] captureSnapshot – tabs.query failed for group", group.id, err);
-      continue;
+    const settings = await getSettings();
+    if (!settings.snapshotsEnabled) {
+      return { success: false, skipped: true, reason: "snapshots-disabled" };
     }
-    groupData.push({
-      title:     group.title     ?? "",
-      color:     group.color     ?? "grey",
-      collapsed: group.collapsed ?? false,
-      windowId:  group.windowId,
-      tabs: tabs.map((t) => ({
-        url:        t.url        ?? "",
-        title:      t.title      ?? "",
-        favIconUrl: t.favIconUrl ?? "",
-      })),
-    });
+
+    const now     = Date.now();
+    const dateStr = new Date(now).toISOString().slice(0, 10); // YYYY-MM-DD
+    const name    = `tabfolio-snapshot-${dateStr}-${now}`;
+
+    let groups;
+    try {
+      groups = await chrome.tabGroups.query({});
+    } catch (err) {
+      console.warn("[TabFolio] captureSnapshot – tabGroups.query failed:", err);
+      return { success: false, error: errorMessage(err) };
+    }
+
+    if (groups.length === 0) {
+      console.log("[TabFolio] captureSnapshot – no groups to capture, skipping.");
+      return { success: false, skipped: true, reason: "no-groups" };
+    }
+
+    const groupData = [];
+    for (const group of groups) {
+      let tabs;
+      try {
+        tabs = await chrome.tabs.query({ groupId: group.id });
+      } catch (err) {
+        console.warn("[TabFolio] captureSnapshot – tabs.query failed for group", group.id, err);
+        continue;
+      }
+      groupData.push({
+        title:     group.title     ?? "",
+        color:     group.color     ?? "grey",
+        collapsed: group.collapsed ?? false,
+        windowId:  group.windowId,
+        tabs: tabs.map((t) => ({
+          url:        t.url        ?? "",
+          title:      t.title      ?? "",
+          favIconUrl: t.favIconUrl ?? "",
+        })),
+      });
+    }
+
+    const snapshot = {
+      id:        now,
+      name,
+      timestamp: now,
+      groups:    groupData,
+    };
+
+    // Load, prepend, and trim to the rolling max.
+    const store     = await chrome.storage.local.get({ snapshots: [] });
+    let   snapshots = [snapshot, ...store.snapshots];
+    const max       = Math.max(1, settings.snapshotMax || 50);
+    if (snapshots.length > max) snapshots = snapshots.slice(0, max); // drop oldest (tail)
+    await chrome.storage.local.set({ snapshots });
+
+    const tabCount = groupData.reduce((n, g) => n + g.tabs.length, 0);
+    console.log(
+      `[TabFolio] Snapshot captured: ${name}`,
+      `(${groupData.length} groups, ${tabCount} tabs, buffer: ${snapshots.length}/${max})`
+    );
+    return { success: true, skipped: false, snapshotId: snapshot.id };
+  } catch (err) {
+    console.error("[TabFolio] captureSnapshot failed:", err);
+    return { success: false, error: errorMessage(err) };
   }
-
-  const snapshot = {
-    id:        now,
-    name,
-    timestamp: now,
-    groups:    groupData,
-  };
-
-  // Load, prepend, and trim to the rolling max.
-  const store     = await chrome.storage.local.get({ snapshots: [] });
-  let   snapshots = [snapshot, ...store.snapshots];
-  const max       = Math.max(1, settings.snapshotMax || 50);
-  if (snapshots.length > max) snapshots = snapshots.slice(0, max); // drop oldest (tail)
-  await chrome.storage.local.set({ snapshots });
-
-  const tabCount = groupData.reduce((n, g) => n + g.tabs.length, 0);
-  console.log(
-    `[TabFolio] Snapshot captured: ${name}`,
-    `(${groupData.length} groups, ${tabCount} tabs, buffer: ${snapshots.length}/${max})`
-  );
 }
 
 // Restore a snapshot by opening all its groups in a new window.
@@ -885,7 +897,7 @@ chrome.tabs.onRemoved.addListener(() => {
 });
 
 // --- 4. Startup tidy on install / update ---
-chrome.runtime.onInstalled.addListener(async () => {
+chrome.runtime.onInstalled.addListener(async (details) => {
   setupContextMenus();
   setupAutoCollapseAlarm();
   setupSnapshotAlarm();
@@ -912,6 +924,20 @@ chrome.runtime.onInstalled.addListener(async () => {
   await Promise.allSettled(windowIds.map((id) => sortGroups(id)));
 
   await detectDuplicates();
+
+  // On a fresh install, capture the initial grouped tab state immediately.
+  // Extension updates still do the startup tidy above, but should not create
+  // an extra snapshot just because a new version was installed.
+  if (details.reason === "install") {
+    try {
+      const result = await captureSnapshot();
+      if (!result?.success) {
+        console.warn("[TabFolio] onInstalled – initial snapshot not captured:", result);
+      }
+    } catch (err) {
+      console.error("[TabFolio] onInstalled – initial snapshot failed:", err);
+    }
+  }
 });
 
 // =============================================================================
@@ -969,9 +995,9 @@ chrome.runtime.onStartup.addListener(() => {
 // =============================================================================
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.action === "captureNow") {
-    captureSnapshot().then(() => sendResponse({ success: true })).catch((err) => {
+    captureSnapshot().then(sendResponse).catch((err) => {
       console.error("[TabFolio] captureNow failed:", err);
-      sendResponse({ success: false, error: err.message });
+      sendResponse({ success: false, error: errorMessage(err) });
     });
     return true; // async
   }
