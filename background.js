@@ -927,7 +927,13 @@ chrome.runtime.onInstalled.addListener(async () => {
 // that appear while we are waiting; the scan below merges any stragglers.
 // =============================================================================
 chrome.runtime.onStartup.addListener(() => {
-  setupContextMenus();
+  // NOTE: setupContextMenus() is intentionally NOT called here.
+  // Chrome context menus are persistent browser state — they survive service-worker
+  // suspension and Chrome restarts without needing recreation. Calling it here
+  // in addition to onInstalled causes a race condition: both removeAll() callbacks
+  // resolve before either batch of create() calls runs, so the second batch always
+  // tries to create IDs that the first batch already registered, producing:
+  //   "Unchecked runtime.lastError: Cannot create item with duplicate id atg-*"
   setupAutoCollapseAlarm();
   setupSnapshotAlarm();
 
