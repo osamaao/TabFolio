@@ -303,17 +303,22 @@ async function captureNow() {
   btn.textContent = "Capturing…";
 
   try {
-    await chrome.runtime.sendMessage({ action: "captureNow" });
+    const result = await chrome.runtime.sendMessage({ action: "captureNow" });
+    if (!result?.success) {
+      const reason = result?.reason ? result.reason.replaceAll("-", " ") : result?.error ?? "unknown error";
+      showToast(`Capture failed: ${reason}.`, "error");
+      return;
+    }
     // Reload snapshots from storage to reflect the new entry
     _snapshots = await loadSnapshots();
     render();
     showToast("Snapshot captured successfully.", "success");
   } catch (err) {
     showToast("Capture failed — background not reachable.", "error");
+  } finally {
+    btn.disabled    = false;
+    btn.textContent = "◈ Take snapshot";
   }
-
-  btn.disabled    = false;
-  btn.textContent = "◈ Take snapshot";
 }
 
 async function clearAll() {
