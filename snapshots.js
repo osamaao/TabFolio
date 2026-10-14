@@ -1,362 +1,96 @@
-// snapshots.js — TabFolio Snapshot Manager
-
-const DEFAULT_SETTINGS = {
-  snapshotsEnabled:  true,
-  snapshotInterval:  60,
-  snapshotMax:       50,
-};
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-function loadSettings() {
-  return new Promise((resolve) =>
-    chrome.storage.sync.get(DEFAULT_SETTINGS, resolve)
-  );
+let data, loading = false;
+const $ = id => document.getElementById(id);
+const date = snapshot => new Date(snapshot.timestamp).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+const counts = snapshot => ({ windows: snapshot.windows.length, groups: snapshot.windows.reduce((n, w) => n + w.groups.length, 0), tabs: snapshot.windows.reduce((n, w) => n + w.tabs.length, 0) });
+async function refresh() {
+  if (loading) return;
+  loading = true;
+  try { data = await UI.send("getSnapshots"); render(); } catch (err) { UI.status(err.message, true); }
+  finally { loading = false; }
 }
-
-function loadSnapshots() {
-  return new Promise((resolve) =>
-    chrome.storage.local.get({ snapshots: [] }, (r) => resolve(r.snapshots))
-  );
-}
-
-function saveSnapshots(snapshots) {
-  return chrome.storage.local.set({ snapshots });
-}
-
-// Relative time string: "just now", "3 min ago", "2 h ago", "Apr 21"
-function relativeTime(ts) {
-  const diff = Date.now() - ts;
-  const min  = Math.floor(diff / 60_000);
-  const hr   = Math.floor(diff / 3_600_000);
-  const day  = Math.floor(diff / 86_400_000);
-  if (diff < 60_000)   return "just now";
-  if (min  < 60)       return `${min} min ago`;
-  if (hr   < 24)       return `${hr} h ago`;
-  if (day  < 7)        return `${day} day${day > 1 ? "s" : ""} ago`;
-  return new Date(ts).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
-function absoluteTime(ts) {
-  return new Date(ts).toLocaleString(undefined, {
-    year: "numeric", month: "short", day: "numeric",
-    hour: "2-digit", minute: "2-digit",
-  });
-}
-
-// ── Toast ─────────────────────────────────────────────────────────────────────
-
-let toastTimer;
-function showToast(text, type = "success") {
-  const el       = document.getElementById("toast");
-  const textEl   = document.getElementById("toastText");
-  textEl.textContent = text;
-  el.className   = `show ${type}`;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.className = ""; }, 3000);
-}
-
-// ── Sidebar stats ─────────────────────────────────────────────────────────────
-
-function updateSidebar(snapshots, settings) {
-  const count      = snapshots.length;
-  const totalGroups = snapshots.reduce((n, s) => n + s.groups.length, 0);
-  const totalTabs   = snapshots.reduce((n, s) =>
-    n + s.groups.reduce((m, g) => m + g.tabs.length, 0), 0);
-
-  document.getElementById("statCount").textContent  = count;
-  document.getElementById("statGroups").textContent = totalGroups;
-  document.getElementById("statTabs").textContent   = totalTabs;
-  document.getElementById("statLatest").textContent =
-    count > 0 ? relativeTime(snapshots[0].timestamp) : "–";
-
-  const max = settings.snapshotMax ?? 50;
-  const pct = count > 0 ? Math.round((count / max) * 100) : 0;
-  document.getElementById("bufferFill").style.width = `${Math.min(100, pct)}%`;
-  document.getElementById("bufferUsed").textContent = `${count} used`;
-  document.getElementById("bufferMax").textContent  = `/ ${max} max`;
-
-  document.getElementById("sEnabled").textContent  =
-    settings.snapshotsEnabled ? "on" : "off";
-  document.getElementById("sInterval").textContent =
-    `${settings.snapshotInterval ?? 60} min`;
-  document.getElementById("sMax").textContent      =
-    String(settings.snapshotMax ?? 50);
-}
-
-// ── Group color CSS class ─────────────────────────────────────────────────────
-
-const COLOR_CLASS = {
-  grey: "gc-grey", blue: "gc-blue", red: "gc-red", yellow: "gc-yellow",
-  green: "gc-green", pink: "gc-pink", purple: "gc-purple",
-  cyan: "gc-cyan", orange: "gc-orange",
-};
-
-// ── Card renderer ─────────────────────────────────────────────────────────────
-
-function renderCard(snapshot, index, onDelete, onRestore) {
-  const totalTabs = snapshot.groups.reduce((n, g) => n + g.tabs.length, 0);
-
-  const card = document.createElement("div");
-  card.className = "snapshot-card";
-  card.dataset.id = String(snapshot.id);
-
-  // ── Header ──
-  const header = document.createElement("div");
-  header.className = "card-header";
-  header.innerHTML = `
-    <span class="card-index">#${index + 1}</span>
-    <div class="card-meta">
-      <div class="card-name" title="${snapshot.name}">${snapshot.name}</div>
-      <div class="card-time" title="${absoluteTime(snapshot.timestamp)}">${absoluteTime(snapshot.timestamp)}</div>
-    </div>
-    <div class="card-chips">
-      <span class="chip chip-groups">${snapshot.groups.length} group${snapshot.groups.length !== 1 ? "s" : ""}</span>
-      <span class="chip chip-tabs">${totalTabs} tab${totalTabs !== 1 ? "s" : ""}</span>
-    </div>
-    <div class="card-actions">
-      <button class="card-btn card-btn-restore" title="Restore into new window">↗ Restore</button>
-      <button class="card-btn card-btn-delete" title="Delete snapshot">✕</button>
-    </div>
-    <span class="card-chevron">▶</span>
-  `;
-
-  // Toggle expand
-  header.addEventListener("click", (e) => {
-    if (e.target.closest(".card-btn")) return;
-    card.classList.toggle("open");
-  });
-
-  // Restore
-  header.querySelector(".card-btn-restore").addEventListener("click", () => onRestore(snapshot, card));
-
-  // Delete
-  header.querySelector(".card-btn-delete").addEventListener("click", () => onDelete(snapshot.id));
-
-  // ── Body ──
-  const body = document.createElement("div");
-  body.className = "card-body";
-
-  const groupList = document.createElement("div");
-  groupList.className = "group-list";
-
-  for (const group of snapshot.groups) {
-    const row = document.createElement("div");
-    row.className = "group-row";
-
-    const dot = document.createElement("div");
-    dot.className = `group-color-dot ${COLOR_CLASS[group.color] ?? "gc-grey"}`;
-
-    const info = document.createElement("div");
-    info.className = "group-info";
-
-    const titleRow = document.createElement("div");
-    titleRow.className = "group-title";
-    titleRow.textContent = group.title || "(untitled)";
-    if (group.collapsed) {
-      const badge = document.createElement("span");
-      badge.className = "group-collapsed-badge";
-      badge.textContent = "collapsed";
-      titleRow.appendChild(badge);
-    }
-
-    const tabsEl = document.createElement("div");
-    tabsEl.className = "group-tabs";
-
-    for (const tab of group.tabs) {
-      const tabRow = document.createElement("div");
-      tabRow.className = "group-tab-row";
-
-      if (tab.favIconUrl && tab.favIconUrl.startsWith("http")) {
-        const img = document.createElement("img");
-        img.className = "tab-favicon";
-        img.src = tab.favIconUrl;
-        img.onerror = () => { img.replaceWith(makeFaviconPlaceholder()); };
-        tabRow.appendChild(img);
-      } else {
-        tabRow.appendChild(makeFaviconPlaceholder());
-      }
-
-      const titleEl = document.createElement("span");
-      titleEl.className = "tab-title";
-      titleEl.textContent = tab.title || tab.url;
-      titleEl.title = tab.title;
-
-      const urlEl = document.createElement("span");
-      urlEl.className = "tab-url";
-      try {
-        urlEl.textContent = new URL(tab.url).hostname;
-      } catch {
-        urlEl.textContent = tab.url;
-      }
-      urlEl.title = tab.url;
-
-      tabRow.append(titleEl, urlEl);
-      tabsEl.appendChild(tabRow);
-    }
-
-    info.append(titleRow, tabsEl);
-    row.append(dot, info);
-    groupList.appendChild(row);
-  }
-
-  body.appendChild(groupList);
-  card.append(header, body);
-  return card;
-}
-
-function makeFaviconPlaceholder() {
-  const d = document.createElement("div");
-  d.className = "tab-favicon-placeholder";
-  return d;
-}
-
-// ── Main render ───────────────────────────────────────────────────────────────
-
-let _snapshots = [];
-let _settings  = { ...DEFAULT_SETTINGS };
-
 function render() {
-  const main = document.getElementById("main");
-  main.innerHTML = "";
-
-  updateSidebar(_snapshots, _settings);
-
-  if (_snapshots.length === 0) {
-    main.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon">◈</div>
-        <div class="empty-title">No snapshots yet</div>
-        <div class="empty-hint">
-          Click <strong>Take snapshot</strong> to capture the current state of all tab groups,
-          or wait for the auto-capture alarm to fire (every ${_settings.snapshotInterval ?? 60} min).
-        </div>
-      </div>`;
-    return;
+  if (!data) return;
+  const open = new Set([...document.querySelectorAll(".snapshot[open]")].map(el => el.dataset.id));
+  $("snapshotCount").textContent = `${data.snapshots.length} saved moment${data.snapshots.length === 1 ? "" : "s"}`;
+  $("schedule").textContent = data.settings.snapshotsEnabled ? `Auto-save every ${data.settings.snapshotInterval} min · keeps up to ${data.settings.snapshotMax}` : "Auto-save is off · manual snapshots are available";
+  $("storageLabel").textContent = `${(data.bytes / 1024 / 1024).toFixed(2)} / ${(data.budget / 1024 / 1024).toFixed(0)} MB`;
+  $("storageMeter").value = data.bytes; $("storageMeter").max = data.budget;
+  $("export").disabled = !data.snapshots.length; $("clear").disabled = !data.snapshots.length;
+  const term = $("snapshotSearch").value.trim().toLowerCase();
+  const snapshots = data.snapshots.filter(s => [s.name, date(s), ...s.windows.flatMap(w => [...w.groups.map(g => g.title), ...w.tabs.flatMap(t => [t.title, t.url])])].some(text => text.toLowerCase().includes(term)));
+  $("snapshots").replaceChildren();
+  if (!snapshots.length) {
+    const empty = UI.el("div", "empty"); empty.append(UI.el("strong", "", term ? "No matching snapshots" : "A place to return to"), UI.el("p", "", term ? "Try a different site, group, or date." : "Take your first snapshot to save your current workspace.")); $("snapshots").append(empty);
   }
-
-  const list = document.createElement("div");
-  list.className = "snapshot-list";
-
-  _snapshots.forEach((snap, i) => {
-    const card = renderCard(snap, i, deleteSnapshot, restoreSnapshot);
-    list.appendChild(card);
-  });
-
-  main.appendChild(list);
-}
-
-// ── Actions ───────────────────────────────────────────────────────────────────
-
-async function deleteSnapshot(id) {
-  _snapshots = _snapshots.filter((s) => s.id !== id);
-  await saveSnapshots(_snapshots);
-
-  // Animate removal
-  const card = document.querySelector(`.snapshot-card[data-id="${id}"]`);
-  if (card) {
-    card.style.transition = "opacity 0.15s, transform 0.15s";
-    card.style.opacity    = "0";
-    card.style.transform  = "translateX(8px)";
-    setTimeout(() => card.remove(), 160);
+  for (const snapshot of snapshots) {
+    const card = UI.el("details", "card snapshot"); card.dataset.id = snapshot.id; card.open = open.has(snapshot.id);
+    const summary = UI.el("summary"); const info = UI.el("span", "snapshot-info");
+    info.append(UI.el("span", "snapshot-name", date(snapshot)));
+    const count = counts(snapshot); info.append(UI.el("small", "", `${count.windows} window(s) · ${count.groups} group(s) · ${count.tabs} tab(s)`));
+    summary.append(info, UI.el("span", "badge", "Preview")); card.append(summary);
+    // Build previews on demand so hundreds of saved layouts remain responsive.
+    const build = () => { if (!card.querySelector(".snapshot-body")) card.append(preview(snapshot)); };
+    if (card.open) build(); card.addEventListener("toggle", () => { if (card.open) build(); });
+    $("snapshots").append(card);
   }
-
-  updateSidebar(_snapshots, _settings);
-  if (_snapshots.length === 0) render();
-  showToast("Snapshot deleted.");
 }
-
-async function restoreSnapshot(snapshot, card) {
-  card.classList.add("restoring");
-  const btn = card.querySelector(".card-btn-restore");
-  if (btn) { btn.textContent = "Restoring…"; btn.disabled = true; }
-
+function preview(snapshot) {
+  const body = UI.el("div", "snapshot-body");
+  for (const [windowIndex, win] of snapshot.windows.entries()) {
+    const section = UI.el("section", "window-preview"); section.append(UI.el("h3", "", `Window ${windowIndex + 1}${win.focused ? " · focused" : ""}`));
+    const buckets = new Map();
+    for (const tab of win.tabs) { if (!buckets.has(tab.groupKey)) buckets.set(tab.groupKey, []); buckets.get(tab.groupKey).push(tab); }
+    for (const [key, tabs] of buckets) {
+      const group = win.groups.find(g => g.key === key);
+      const box = UI.el("div", "preview-group"); const header = UI.el("div", "row between");
+      header.append(UI.el("strong", "", group?.title || (group ? "Untitled group" : "Ungrouped tabs")));
+      if (group) header.append(UI.button("Restore group", () => restore(snapshot, { windowIndex, groupKey: group.key }), "small"));
+      box.append(header);
+      for (const tab of tabs) {
+        const row = UI.el("div", "preview-tab"); const text = UI.el("span", "", tab.title || tab.url); text.title = tab.url;
+        row.append(text); const flags = [tab.pinned && "Pinned", tab.active && "Active", !TF.httpUrl(tab.url) && "Will skip"].filter(Boolean);
+        if (flags.length) row.append(UI.el("small", "", flags.join(" · "))); box.append(row);
+      }
+      section.append(box);
+    }
+    body.append(section);
+  }
+  const actions = UI.el("div", "snapshot-actions");
+  actions.append(UI.button("Restore full layout", () => restore(snapshot), "primary"), UI.button("Export this snapshot", () => download([snapshot])),
+    UI.button("Delete snapshot", async () => { if (await UI.confirm("Delete this snapshot?", "Export it first if you need a backup. This removes the saved snapshot, not your open tabs.", "Delete snapshot", true)) { await UI.act("deleteSnapshot", { snapshotId: snapshot.id }); await refresh(); } }, "danger"));
+  body.append(actions); return body;
+}
+async function restore(snapshot, selection = null) {
+  const tabs = snapshot.windows.flatMap((w, i) => w.tabs.filter(t => !selection || i === selection.windowIndex && t.groupKey === selection.groupKey));
+  const restorable = tabs.filter(t => TF.httpUrl(t.url)).length;
+  if (!restorable) { UI.status("This selection has no HTTP or HTTPS tabs to restore.", true); return; }
+  if (!await UI.confirm("Restore this workspace?", `Open ${restorable} tab(s) in new window(s)? ${tabs.length - restorable} unsupported URL(s) will be skipped. Existing windows stay open.`, "Restore")) return;
+  $("failures").hidden = true;
+  UI.status("Restoring your workspace…");
+  const result = await UI.act("restoreSnapshot", { snapshotId: snapshot.id, selection });
+  UI.status(result.message, result.partial);
+  const details = [...(result.failures || []), ...(result.adjustments || [])];
+  if (details.length) { $("failures").replaceChildren(...details.map(message => UI.el("p", "", message))); $("failures").hidden = false; }
+}
+function download(snapshots) {
+  const blob = new Blob([JSON.stringify({ format: "tabfolio", version: 2, exportedAt: new Date().toISOString(), snapshots }, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob); const a = UI.el("a"); a.href = url; a.download = `tabfolio-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+$("capture").addEventListener("click", async () => { $("capture").disabled = true; try { await UI.act("captureNow"); await refresh(); } catch (err) { UI.status(err.message, true); } finally { $("capture").disabled = false; } });
+$("export").addEventListener("click", () => download(data.snapshots));
+$("import").addEventListener("click", () => $("importFile").click());
+$("importFile").addEventListener("change", async () => {
   try {
-    const result = await chrome.runtime.sendMessage({
-      action:   "restoreSnapshot",
-      snapshot,
-    });
-
-    if (result?.success) {
-      card.classList.remove("restoring");
-      card.classList.add("restored");
-      if (btn) btn.textContent = "↗ Restore";
-      showToast(`Restored "${snapshot.name}" in a new window.`, "success");
-    } else {
-      card.classList.remove("restoring");
-      if (btn) { btn.textContent = "↗ Restore"; btn.disabled = false; }
-      showToast(`Restore failed: ${result?.error ?? "unknown error"}`, "error");
-    }
-  } catch (err) {
-    card.classList.remove("restoring");
-    if (btn) { btn.textContent = "↗ Restore"; btn.disabled = false; }
-    showToast("Restore failed — background not reachable.", "error");
-  }
-
-  // Remove the "restored" highlight after a moment
-  setTimeout(() => card.classList.remove("restored"), 2500);
-}
-
-async function captureNow() {
-  const btn = document.getElementById("captureNowBtn");
-  btn.disabled = true;
-  btn.textContent = "Capturing…";
-
-  try {
-    const result = await chrome.runtime.sendMessage({ action: "captureNow" });
-    if (!result?.success) {
-      const reason = result?.reason ? result.reason.replaceAll("-", " ") : result?.error ?? "unknown error";
-      showToast(`Capture failed: ${reason}.`, "error");
-      return;
-    }
-    // Reload snapshots from storage to reflect the new entry
-    _snapshots = await loadSnapshots();
-    render();
-    showToast("Snapshot captured successfully.", "success");
-  } catch (err) {
-    showToast("Capture failed — background not reachable.", "error");
-  } finally {
-    btn.disabled    = false;
-    btn.textContent = "◈ Take snapshot";
-  }
-}
-
-async function clearAll() {
-  if (!confirm(`Delete all ${_snapshots.length} snapshots? This cannot be undone.`)) return;
-  _snapshots = [];
-  await saveSnapshots([]);
-  render();
-  showToast("All snapshots cleared.");
-}
-
-// ── Init ──────────────────────────────────────────────────────────────────────
-
-document.addEventListener("DOMContentLoaded", async () => {
-  // Show shimmer while loading
-  const main = document.getElementById("main");
-  main.innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:10px;">
-      <div class="loading-shimmer"></div>
-      <div class="loading-shimmer" style="height:48px;opacity:.6"></div>
-      <div class="loading-shimmer" style="height:48px;opacity:.35"></div>
-    </div>`;
-
-  [_settings, _snapshots] = await Promise.all([loadSettings(), loadSnapshots()]);
-
-  render();
-
-  document.getElementById("captureNowBtn").addEventListener("click", captureNow);
-  document.getElementById("clearAllBtn").addEventListener("click", clearAll);
-
-  // Live-update if another page/popup changes storage
-  chrome.storage.onChanged.addListener(async (changes, area) => {
-    if (area === "local" && changes.snapshots) {
-      _snapshots = changes.snapshots.newValue ?? [];
-      render();
-    }
-    if (area === "sync" && (changes.snapshotsEnabled || changes.snapshotInterval || changes.snapshotMax)) {
-      _settings = await loadSettings();
-      updateSidebar(_snapshots, _settings);
-    }
-  });
+    const file = $("importFile").files[0]; if (!file) return;
+    if (file.size > 8 * 1024 * 1024) throw Error("Choose a JSON backup smaller than 8 MB.");
+    const content = JSON.parse(await file.text()); const snapshots = TF.parseImport(content);
+    if (!await UI.confirm("Import snapshots?", `Add ${snapshots.length} saved snapshot(s) from this file? Tabs will not be opened. Existing snapshots are kept.`, "Import")) return;
+    await UI.act("importSnapshots", { data: content }); await refresh();
+  } catch (err) { UI.status(err instanceof SyntaxError ? "This file is not valid JSON." : err.message, true); }
+  finally { $("importFile").value = ""; }
 });
+$("clear").addEventListener("click", async () => { if (await UI.confirm("Delete all snapshots?", "This cannot be undone. Export a backup first if you want to keep these saved layouts.", "Delete all", true)) { try { await UI.act("clearSnapshots"); await refresh(); } catch (err) { UI.status(err.message, true); } } });
+$("snapshotSearch").addEventListener("input", render);
+chrome.storage.onChanged.addListener((changes, area) => { if (area === "local" && changes.snapshots || area === "sync") void refresh(); });
+refresh();
