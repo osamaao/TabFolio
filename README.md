@@ -1,173 +1,259 @@
 # TabFolio
 
-> Your browser tabs, bound and organised. TabFolio automatically groups Chrome tabs by domain into clean, named collections — with subdomain-aware routing, duplicate detection, alphabetical sorting, auto-collapse, session snapshots, and a one-shortcut collapse.
+A Chrome side panel for finding and organizing tabs, protecting your own groups,
+reviewing duplicates, and restoring saved window layouts.
 
----
+## What's new in 3.0.0 (unreleased)
 
-## Features
+The current development version adds these features and improvements over version 2:
 
+- **Searchable side panel:** find tabs by title, URL or group name in the current
+  window or across all windows. Open it from the toolbar, page context menu or
+  **Alt+Shift+F**; use `/`, arrow keys, Enter and Escape to search and navigate.
+- **Tab and group controls:** focus a tab and its window, move tabs into groups
+  across windows, keep tabs ungrouped, and rename, expand or collapse groups.
+- **Protected manual arrangements:** choose **Keep my arrangement** or **Manage
+  automatically** per group. Native Chrome edits are respected, and preferences
+  can be recovered across browser restarts. Unknown groups are protected on upgrade.
+- **Keep expanded and timed pause:** exempt individual groups from collapse or
+  pause automatic organization for 15, 30 or 60 minutes, with automatic expiry.
+- **Undo organization:** restore the last automatic grouping/sorting operation
+  while its resulting layout is unchanged, then protect the restored arrangement.
+- **Merge same-name groups:** combine groups with identical, non-empty names
+  within each selected window, preserving the leftmost group's color and ordered
+  members. Also available as **Merge identical groups** in the page context menu.
+- **Sort Groups:** explicitly sort protected or automatic groups A–Z using
+  case-insensitive natural number order, stable ties and unnamed groups last.
+  Merge and sort use the selected window scope independently of search.
+- **Safer site routing:** distinguish domain identity from group names and reuse
+  matching protected site groups, including renamed groups with saved identities
+  and matching sites in explicitly merged groups.
+- **More reliable idle collapse:** default to a full 10 minutes after leaving or
+  expanding a group, preserve custom delays, and keep active and Keep expanded
+  groups open during automatic or bulk collapse.
+- **Duplicate review and cleanup:** show a toolbar duplicate count, review exact
+  URL matches across windows, and close explicitly selected copies after
+  confirmation. Active, pinned and audible tabs are protected, and at least one
+  copy remains.
+- **Full-window recovery:** snapshots now include pinned and ungrouped tabs,
+  tab order, selected tabs, window focus and group preferences. Restore a complete
+  layout into separate new windows or restore just one group.
+- **Searchable snapshot history and backups:** preview saved layouts, search by
+  date, site, title or group, export all snapshots or one snapshot, and import
+  validated JSON backups. Legacy snapshots remain readable.
+- **Dependable snapshot storage:** capture manually with scheduling disabled,
+  see actual storage use, and retain snapshots within count and byte limits.
+  Serialized writes prevent lost updates; restore results report skipped URLs,
+  partial failures and interrupted restores while protecting opened tabs.
+- **Dedicated settings and refreshed interface:** edit domain lists in batches,
+  configure shortcuts, and use responsive light/dark pages with accessible
+  labels, keyboard focus and live action feedback.
+- **Reduced permissions:** duplicate review replaces page-title warning injection.
+  TabFolio no longer requests scripting or broad host permissions, and excludes
+  private browsing data from snapshots, duplicate review and durable preferences.
 
-| Feature                     | Details                                                                                                                                     |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Auto-grouping**           | Tabs are grouped by domain the moment they open or navigate                                                                                 |
-| **Subdomain routing**       | Platform domains (Google, GitHub, Office 365, …) split into per-product groups — `docs.google.com` → **docs**, `maps.google.com` → **maps** |
-| **Duplicate detection**     | Duplicate tabs across any window are flagged with ⚠️ in their title                                                                         |
-| **Alphabetical sorting**    | Groups are kept in A–Z order within each window                                                                                             |
-| **Collapse shortcut**       | `Alt+Shift+C` collapses every group in the current window instantly                                                                         |
-| **Auto-collapse idle groups** | Groups not visited for a configurable number of minutes (default: 5) are automatically collapsed; the active tab's group is never collapsed |
-| **Snapshots**               | Periodically saves the full state of all tab groups; a dedicated manager page lets you browse and restore any snapshot into a new window     |
-| **Excluded domains**        | Any domain can be excluded from grouping via the popup                                                                                      |
-| **Custom platform domains** | Add your own company domains so subdomains get their own group                                                                              |
+Version 3 requires **Chrome 116 or newer**. See [CHANGELOG.md](CHANGELOG.md) for
+the complete changes against remote `main`, and [VALIDATION.md](VALIDATION.md)
+for automated coverage and pending live Chrome checks.
 
+## Install or update
 
----
+Requires **Chrome 116 or newer**. No build step is needed to run the extension.
 
-## Installation
+1. Open `chrome://extensions` and enable **Developer mode**.
+2. Select **Load unpacked** and choose this repository. For an existing install,
+   click **Reload** on TabFolio's card.
+3. Pin TabFolio in Chrome's toolbar and click it to open the side panel.
 
-> The extension is not yet on the Chrome Web Store. Install it manually in Developer Mode.
+Version 3 replaces the settings popup with a side panel. Settings are available
+from the panel or Chrome's extension options. Your existing settings and legacy
+snapshots are retained. Existing groups default to **Keep my arrangement** if
+TabFolio cannot identify their ownership, so an update won't rearrange them.
+Choose **Manage automatically** in a group's options to opt it in.
 
-1. Clone or download this repository.
-2. Open `chrome://extensions` in Chrome.
-3. Enable **Developer mode** (top-right toggle).
-4. Click **Load unpacked** and select the repository folder.
+The old version's warning symbols in already-open page titles may remain until
+those pages reload. Version 3 does not inject or run page-title observers.
 
----
+## Find and manage tabs
 
-## How grouping works
+Search by title, URL, or group name. Select **Current window** or **All windows**.
+Click a result to focus its tab and window. Use **Move** to place a tab in a group
+in any window or keep it ungrouped. Pinned tabs must be unpinned in Chrome first.
+For an ungrouped tab, the Move menu also offers automatic management again.
 
-For most sites, the registrable domain (eTLD+1) is used as the group name:
+- **Alt+Shift+F** opens TabFolio. `/` focuses search within the panel.
+- **Up/Down** navigates search results; **Enter** focuses the selected tab.
+- **Alt+Shift+C** or **Collapse idle** folds groups in the current window, keeping
+  the active group and groups marked Keep expanded open.
+- Customize shortcuts at `chrome://extensions/shortcuts` or from Settings.
 
-```
-github.com        → github
-stackoverflow.com → stackoverflow
-notion.so         → notion
-```
+Use **Merge same-name groups** below the window selector to combine groups with
+identical, non-empty names. Matching is exact and case-sensitive: “Work”, “work”
+and “Work ” are different names. **Current window** merges only that window;
+**All windows** merges matches independently within each window. Search does not
+limit the merge, and tabs stay in their existing windows.
 
-For **platform domains**, the leading subdomain is used instead, so each product gets its own group:
+You can also right-click a page and choose **TabFolio → Merge identical groups**.
+This uses the same exact-name matching and merges groups only in the window
+where you right-clicked.
 
-```
-docs.google.com       → docs
-maps.google.com       → maps
-gemini.google.com     → gemini
-studio.youtube.com    → studio
-gist.github.com       → gist
-word.office.com       → word
-jira.atlassian.net    → jira
-```
+The leftmost matching group keeps its name and color. Other groups' tabs are
+appended in group and tab order, without closing or reloading pages. **Keep expanded**
+is retained if any matching group has it, and a group containing the active tab
+stays expanded. Merged arrangements use **Keep my arrangement** so automatic
+domain grouping cannot split them again. This manual action clears any previous
+automatic-organization Undo. If Chrome refuses an edit or a group changes during
+merging, the panel reports completed work and remaining failures; review and retry.
 
-Built-in platform domains: `google.com`, `microsoft.com`, `office.com`, `live.com`, `atlassian.net`, `atlassian.com`, `apple.com`, `adobe.com`, `youtube.com`, `github.com`, `notion.so`, `figma.com`, `shopify.com`, `salesforce.com`.
+Click **Sort Groups** beside the merge button to sort group names A–Z, including
+protected groups. Sorting ignores case, uses natural number order (Group 2 before
+Group 10), keeps equal names in their existing order, and puts unnamed groups last.
+It uses the selected window scope regardless of search. Windows that need
+reordering place their sorted groups after pinned and ungrouped tabs, retaining
+tab order within groups, group colors, collapsed state and the selected tab.
+Group membership and management preferences stay the same. This explicit action
+works while automation is paused, protects the window's new ordering from
+automatic sorting, and clears the previous automatic-organization Undo.
 
-Custom platform domains can be added from the popup.
+Duplicate review uses exact parsed HTTP/HTTPS URLs. Queries, parameter order,
+fragments, protocols, and paths remain significant; similar pages are not treated
+as interchangeable. Review shows all copies of a matching URL across windows.
+Choose the copies to close, then confirm. Active, pinned, audible and private tabs
+are protected; TabFolio rechecks URLs and retains at least one copy. Unsaved page
+content in explicitly closed tabs cannot be recovered by TabFolio.
 
----
+## Automation that respects your choices
 
-## Keyboard shortcut
+New eligible tabs are grouped by domain. Known platforms such as Google and
+GitHub split by product subdomain: `docs.google.com` and `maps.google.com` get
+separate groups. Routing uses a domain identity independent of the visible name,
+so unrelated groups both named “docs” never merge automatically simply because
+of that name. The explicit **Merge same-name groups** button lets you combine them.
 
+New tabs also reuse existing protected site groups in the same window. This works
+for all eligible sites, product subdomains and custom platform domains. For
+example, opening `github.com` joins an existing **github** group, and
+`docs.google.com` joins **docs**, including groups protected after merging.
+A protected destination must have the site's name
+(ignoring case and surrounding spaces) or its saved site identity, and contain
+a tab from that same domain. Explicitly merged groups can receive new tabs for
+each site already represented in them. Existing members, names, colors and
+management preferences are preserved; the destination expands when a tab joins.
+Paused automation, excluded sites, pinned/private tabs and explicit ungrouped
+overrides continue to be respected.
 
-| Shortcut      | Action                                    |
-| ------------- | ----------------------------------------- |
-| `Alt+Shift+C` | Collapse all groups in the current window |
+Group options include:
 
+- **Keep my arrangement:** protect existing members and naming from automatic
+  changes; matching new site tabs can still join.
+- **Manage automatically:** allow domain-based management on subsequent navigation.
+- **Keep expanded:** exempt this group from automatic and bulk idle collapse.
+- **Rename:** set a name and protect the group from automatic regrouping.
 
-To remap, visit `chrome://extensions/shortcuts`.
+Native Chrome regrouping, ungrouping, renaming and recoloring are respected.
+Moving a group manually stops automatic sorting for that window. A–Z sorting
+runs only in windows where all groups are managed automatically. Excluded domains
+and custom platform domains can be set in Settings, one domain per line.
 
----
+**Idle collapse defaults to 10 minutes**, measured from leaving a group or
+expanding it. Active groups in every window stay open. Checks run once a minute
+and may be delayed by sleep; no group should collapse before its full idle delay.
+A saved custom delay is preserved. Pause automation for 15, 30 or 60 minutes from
+the panel; the pause expires automatically. Groups already idle beyond the delay
+can collapse once automation resumes.
+
+**Undo organization** restores the last automatic grouping/sorting operation
+in its window. It is available only while that window still has the resulting
+layout. Later manual changes invalidate Undo so it cannot overwrite them. Undo
+protects the restored arrangement from immediately being applied again. It does
+not reopen closed tabs or undo page navigation.
+
+Preferences and manual overrides survive worker suspension. On a browser restart,
+group preferences are matched by name, color and member URLs. Ambiguous matches
+are protected as manual groups. Ungrouped manual overrides are matched by URL;
+identical copies may therefore also be protected. Exact timer history and Undo
+are not intended to survive uninstalling the extension.
+
+## Saved snapshots
+
+Automatic capture defaults to every **60 minutes**, retaining up to **50 snapshots**.
+Manual capture works even when automatic capture is disabled. A snapshot records
+normal, non-private windows, group names/colors/collapsed state, tab order, pinned
+and selected tabs, and ungrouped tabs. It records URLs and layout, not page contents,
+login state, navigation history, form edits, or window geometry.
+
+Open **Saved snapshots** to:
+
+- Search by date, site, page title or group name and preview a saved layout.
+- Restore the complete layout into separate new windows, or restore one group.
+- Export all snapshots or one snapshot to a JSON backup and import it later.
+- Delete individual snapshots or clear the collection after confirmation.
+
+Only HTTP and HTTPS pages are reopened. Internal Chrome pages, local files,
+JavaScript URLs and extension pages are listed as skipped. An active tab's group
+must remain expanded. The result reports skipped URLs, state adjustments and
+individual failures; successfully opened tabs are retained on partial failure.
+Restored groups and ungrouped tabs are protected from automatic reorganization.
+If restoration is interrupted by worker termination, the next start reports it
+and protects the opened restore windows; inspect those windows before retrying.
+
+Legacy group-only snapshots remain readable and can be exported in the new
+versioned format. Their saved window IDs recover window boundaries; information
+that the old format never captured (such as pinned or ungrouped tabs) cannot be
+recreated.
+
+All snapshot mutations share a queue. Capture evicts the oldest entries to honor
+both the count limit and a **6 MB snapshot budget**, with room reserved for other
+extension data. Import validates the entire file, rejects malformed layouts and
+oversized files (8 MB maximum), skips snapshot IDs already present, and fails
+without changing storage if it would exceed retention limits. Import never evicts
+existing snapshots. The manager displays actual stored bytes.
+
+Snapshots are device-local and are **removed when the extension is uninstalled**.
+Export a backup before uninstalling or moving machines. Neither snapshots nor tab
+URLs are uploaded to a TabFolio server.
 
 ## Permissions
 
+| Permission | Purpose |
+| --- | --- |
+| `tabs` | Read titles and URLs; focus, move and explicitly close selected tabs |
+| `tabGroups` | Read and manage groups |
+| `sidePanel` | Persistent tab control panel |
+| `contextMenus` | Open the panel, exclude a site, keep a tab ungrouped, collapse idle groups, merge identical group names |
+| `storage` | Synced preferences, local snapshots and session state |
+| `alarms` | Idle checks and automatic snapshots |
 
-| Permission     | Why                                            |
-| -------------- | ---------------------------------------------- |
-| `tabs`         | Read tab URLs to determine grouping            |
-| `tabGroups`    | Create, update, and move tab groups            |
-| `scripting`    | Inject the duplicate-title observer into pages |
-| `contextMenus` | Right-click menu for quick exclude / ungroup   |
-| `alarms`       | Fire the periodic idle-collapse check and snapshot alarm (both survive service-worker suspension) |
-| `storage`      | Persist settings across sessions               |
+No host permissions, content scripts or `scripting` permission are requested.
 
+## Development and verification
 
----
+Node.js 18+ is used for development checks. Install test dependencies with `npm ci`.
 
-## Project structure
-
-```
-tabfolio/
-├── manifest.json    # MV3 manifest
-├── background.js    # Service worker — grouping, sorting, duplicate detection, auto-collapse, snapshots
-├── popup.html       # Settings popup UI
-├── popup.js         # Popup logic — settings persistence and domain management
-├── snapshots.html   # Snapshot manager page
-└── snapshots.js     # Snapshot manager logic — browse, restore, delete
+```sh
+npm test
+npm run check
 ```
 
----
+The automated suite uses a Chrome API harness and a DOM implementation. It covers
+idle boundaries, worker and browser restarts, ownership, undo, duplicate review,
+layout restoration, interruptions, import validation, quota failures, races and
+100-tab grouping. DOM tests check UI behavior; they do not verify Chrome rendering.
+See [VALIDATION.md](VALIDATION.md) for the live Chrome acceptance checklist and
+current verification status, and [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)
+for the implementation scope.
 
-## Snapshots
-
-TabFolio can automatically save the full state of all tab groups at a regular interval, giving you a rolling history you can restore at any time.
-
-### How it works
-
-A `chrome.alarms` recurring alarm fires at the configured interval (default: every 60 minutes). When it fires, `captureSnapshot()` queries every tab group across all open windows and records each group's title, color, collapsed state, and the URL, title, and favicon of every tab inside it. The result is stored as a single snapshot object in `chrome.storage.local` under the key `snapshots`.
-
-Snapshots are kept in a rolling buffer (default: 50). Once the buffer is full, the oldest snapshot is dropped to make room for the newest (FIFO). Both the interval and the buffer size are adjustable from the popup.
-
-### Naming convention
-
-Each snapshot is named:
-
+```text
+background.js       Chrome events, commands, messages and lifecycle
+core.js             Shared settings, routing, exact URL matching and schema validation
+automation.js       Ownership, grouping/sorting queue, undo and explicit tab actions
+activity.js         Persistent idle timestamps and collapse checks
+recovery.js         Snapshot capture, retention, import and restoration
+panel.html/js       Searchable tab side panel and duplicate review
+settings.html/js    Dedicated settings page
+snapshots.html/js   Snapshot search, preview, restore and backup
+ui.js / styles.css  Shared interface helpers and responsive light/dark styles
+tests/              Chrome API harness, regression suite and static checks
 ```
-tabfolio-snapshot-YYYY-MM-DD-<unix-timestamp-ms>
-```
 
-For example: `tabfolio-snapshot-2026-04-23-1745447432910`
-
-### Snapshot manager
-
-Open the manager from the popup ("Open Snapshot Manager") or by navigating directly to the extension page. It shows:
-
-- A live overview of snapshot count, total groups, total tabs, and time since the last capture
-- A buffer-usage bar showing how full the rolling window is
-- A card for each snapshot, expandable to show every group and its tabs (with favicons, titles, and hostnames)
-- Per-snapshot **Restore** and **Delete** actions
-- A **Take Snapshot** button for an immediate on-demand capture
-
-### Restoring a snapshot
-
-Clicking **Restore** opens the snapshot in a **new window** — your current session is never disturbed. TabFolio recreates each group with its original title, color, and collapsed state, then opens all HTTP/HTTPS tabs into their respective groups.
-
-### Storage and persistence
-
-Snapshots are stored in `chrome.storage.local` (device-local, not synced). This storage is **cleared when the extension is uninstalled**. If you reinstall or move to a new machine, previously captured snapshots will be lost. To guard against this, export your snapshots as a JSON file before uninstalling and re-import them afterwards — see the manager page for export/import controls.
-
----
-
-## Changelog
-
-### [#3](https://github.com/osamaao/TabFolio/pull/3) — feat: tab auto-snapshots
-
-Adds a full snapshot system. Key details: `captureSnapshot()` runs on a configurable `chrome.alarms` alarm (default 60 min) and persists all tab-group state to `chrome.storage.local`; a FIFO rolling buffer caps storage at a user-defined maximum (default 50); `restoreSnapshot()` recreates groups in a new window without touching the current session; a new `snapshots.html` manager page provides a full history UI with per-snapshot restore, delete, and on-demand capture. Popup gains an "Auto-snapshots" toggle, interval and max-buffer inputs, and a link to the manager. The existing `alarms` permission covers the new alarm.
-
-### [#2](https://github.com/osamaao/TabFolio/pull/2) — feat: auto-collapse idle tab groups
-
-Groups that haven't been visited for a configurable number of minutes are automatically collapsed. The group containing the currently active tab is never collapsed. The idle threshold (1–60 min, default 5) is adjustable from the popup, and the feature can be disabled entirely with its toggle. Uses a 1-minute `chrome.alarms` recurring alarm so the check survives service-worker suspension.
-
-### [#1](https://github.com/osamaao/TabFolio/pull/1) — fix: always expand groups when a tab is added
-
-Groups were silently staying collapsed when a tab was opened in the background (e.g. right-click → "Open Link in New Tab"). New groups are now created with `collapsed: false`, and existing groups are explicitly expanded whenever a tab is added to them.
-
----
-
-## Contributing
-
-1. Fork the repo and create a feature branch.
-2. Load the unpacked extension to test locally.
-3. Open a pull request with a clear description of the change.
-
-Bug reports and feature requests are welcome via [Issues](../../issues).
-
----
-
-## License
-
-MIT
+MIT license. Issues and pull requests are welcome.

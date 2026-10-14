@@ -1,35 +1,36 @@
 {
   "manifest_version": 3,
   "name": "TabFolio",
-  "description": "TabFolio automatically groups tabs by hostname, sorts groups alphabetically, and warns you when a duplicate tab is open across any window.",
-  "version": "2.0",
-  "minimum_chrome_version": "90",
+  "description": "Find and organize your tabs, protect your groups, review duplicates, and restore saved window layouts.",
+  "version": "3.0.0",
+  "minimum_chrome_version": "116",
   "permissions": [
     "tabs",
     "tabGroups",
-    "scripting",
+    "sidePanel",
     "contextMenus",
     "storage",
     "alarms"
   ],
-  "host_permissions": [
-    "http://*/*",
-    "https://*/*"
-  ],
   "commands": {
+    "open-tabfolio": {
+      "suggested_key": { "default": "Alt+Shift+F", "mac": "Alt+Shift+F" },
+      "description": "Open TabFolio"
+    },
     "collapse-all-groups": {
       "suggested_key": {
         "default":    "Alt+Shift+C",
         "mac":        "Alt+Shift+C"
       },
-      "description": "Collapse all tab groups in the current window"
+      "description": "Collapse idle groups in the current window"
     }
   },
   "background": {
     "service_worker": "background.js"
   },
   "action": {
-    "default_popup": "popup.html",
-    "default_title": "TabFolio"
-  }
+    "default_title": "Open TabFolio"
+  },
+  "side_panel": { "default_path": "panel.html" },
+  "options_ui": { "page": "settings.html", "open_in_tab": true }
 }

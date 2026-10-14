@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>TabFolio — Your tabs</title><link rel="stylesheet" href="styles.css"></head>
+<body class="panel">
+<header class="panel-header">
+  <div class="row between"><a class="brand" href="panel.html"><span class="brand-mark" aria-hidden="true">▤</span>TabFolio</a><button id="settings" class="quiet small">Settings</button></div>
+  <div class="eyebrow">A little room to think</div><h1 class="panel-title">Your tabs, in order.</h1>
+  <label for="search" class="visually-hidden">Search tabs, sites, and groups</label><input id="search" class="search" type="search" placeholder="Search tabs, sites, groups…" autocomplete="off">
+  <div class="scope"><label for="scope" class="visually-hidden">Window scope</label><select id="scope"><option value="current">Current window</option><option value="all">All windows</option></select><button id="collapse" class="small">Collapse idle</button></div>
+  <div class="group-tools"><div class="group-tool-buttons"><button id="mergeGroups" class="small" aria-describedby="mergeGroupsHint" disabled>Merge same-name groups</button><button id="sortGroups" class="small" disabled>Sort Groups</button></div><p id="mergeGroupsHint" class="keyboard-hint">Exact names, per window. Tabs stay open.</p></div>
+  <nav class="view-tabs" aria-label="Tab views"><button id="tabsView" aria-pressed="true">All tabs</button><button id="duplicatesView" aria-pressed="false">Duplicates <span id="dupeCount"></span></button></nav>
+</header>
+<div class="automation-bar"><span id="automationStatus">Automation active</span><label for="pause" class="visually-hidden">Pause automation</label><select id="pause"><option value="" disabled selected>Automation controls</option><option value="0">Keep automation running</option><option value="15">Pause for 15 min</option><option value="30">Pause for 30 min</option><option value="60">Pause for 1 hour</option></select><button id="undo" class="small" disabled>Undo organization</button></div>
+<div id="status" class="status" role="status" aria-live="polite" hidden></div>
+<main class="panel-main"><p id="resultCount" class="result-count" aria-live="polite">Loading your workspace…</p><div id="results"></div></main>
+<div id="reviewActions" class="review-actions" hidden><button id="closeSelected" class="danger" disabled>Close selected duplicates</button><p class="keyboard-hint">Active, pinned and audible tabs are protected.</p></div>
+<footer class="panel-footer"><a href="snapshots.html" id="snapshots">Saved snapshots ↗</a><span class="keyboard-hint">/ to search · ↓ to browse</span></footer>
+<script src="core.js"></script><script src="ui.js"></script><script src="panel.js"></script>
+</body></html>

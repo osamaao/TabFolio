@@ -1,0 +1,24 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>TabFolio — Settings</title><link rel="stylesheet" href="styles.css"></head>
+<body><main class="page"><nav class="page-nav" aria-label="Navigation"><a class="brand" href="panel.html"><span class="brand-mark" aria-hidden="true">▤</span>TabFolio</a><a href="snapshots.html">Saved snapshots ↗</a></nav>
+<div class="page-heading"><div><div class="eyebrow">Make room for your way of working</div><h1>Settings</h1><p>Choose what TabFolio takes care of. Your manual groups and tab arrangements stay yours.</p></div></div>
+<div id="status" class="status" role="status" aria-live="polite" hidden></div>
+<form id="settingsForm"><div class="settings-layout">
+<section class="card"><h2>Organization</h2>
+<div class="setting"><label for="autoGroup"><strong>Group tabs automatically</strong><small>Organize new tabs by site. Manual groups are protected.</small></label><input id="autoGroup" type="checkbox"></div>
+<div class="setting"><label for="sortAlpha"><strong>Sort automatic groups A–Z</strong><small>Only in windows without manual groups or manual ordering.</small></label><input id="sortAlpha" type="checkbox"></div>
+<div class="setting"><label for="autoCollapse"><strong>Collapse idle groups</strong><small>Active groups and Keep expanded groups stay open.</small></label><input id="autoCollapse" type="checkbox"></div>
+<div class="setting"><label for="autoCollapseDelay"><strong>Idle delay, in minutes</strong><small>Starts when you leave a group. Default: 10 minutes.</small></label><input id="autoCollapseDelay" type="number" min="1" max="60" required></div>
+<div class="setting"><label for="detectDupes"><strong>Review duplicate tabs</strong><small>Exact URL matches only. Nothing closes automatically.</small></label><input id="detectDupes" type="checkbox"></div>
+</section>
+<section class="card"><h2>Snapshots</h2>
+<div class="setting"><label for="snapshotsEnabled"><strong>Save automatic snapshots</strong><small>Manual snapshots are always available.</small></label><input id="snapshotsEnabled" type="checkbox"></div>
+<div class="setting"><label for="snapshotInterval"><strong>Capture every, in minutes</strong><small>Chrome may delay capture while the browser is asleep.</small></label><input id="snapshotInterval" type="number" min="1" max="1440" required></div>
+<div class="setting"><label for="snapshotMax"><strong>Maximum snapshots</strong><small>The oldest snapshots are removed at this limit or the 6 MB storage budget.</small></label><input id="snapshotMax" type="number" min="1" max="200" required></div>
+<p class="muted">Snapshots stay on this device. Export a backup before removing the extension. Private windows are not saved.</p>
+</section>
+<section class="card"><h2>Excluded sites</h2><p class="muted">New tabs on these domains and their subdomains stay ungrouped. Existing tabs keep their arrangement.</p><label class="field" for="excludedDomains">One domain per line<textarea id="excludedDomains" placeholder="localhost&#10;example.com" spellcheck="false"></textarea></label></section>
+<section class="card"><h2>Split sites by subdomain</h2><p class="muted">Give each product its own group, like docs.google.com and maps.google.com.</p><label class="field" for="platformDomains">Additional platform domains, one per line<textarea id="platformDomains" placeholder="mycompany.com" spellcheck="false"></textarea></label><details><summary>Built-in platform domains</summary><p id="platformList" class="muted"></p></details></section>
+<section class="card"><h2>Keyboard shortcuts</h2><p id="shortcuts" class="muted">Alt + Shift + F · Open TabFolio<br>Alt + Shift + C · Collapse idle groups</p><button id="configureShortcuts" type="button" class="small">Customize shortcuts</button></section>
+<section class="card"><h2>Your privacy</h2><p class="muted">TabFolio reads tab titles and URLs to organize your workspace. It does not inject scripts, change page titles, or send your browsing data to a server. Preferences sync with Chrome; snapshots stay local.</p></section>
+</div><div class="settings-save"><button id="save" class="primary" type="submit">Save settings</button></div></form>
+</main><script src="core.js"></script><script src="ui.js"></script><script src="settings.js"></script></body></html>

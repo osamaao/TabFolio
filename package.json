@@ -1,0 +1,16 @@
+{
+  "name": "tabfolio",
+  "version": "3.0.0",
+  "private": true,
+  "description": "TabFolio extension development checks",
+  "scripts": {
+    "test": "node --test tests/*.test.cjs",
+    "check": "node tests/check.cjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "linkedom": "0.18.13"
+  }
+}
