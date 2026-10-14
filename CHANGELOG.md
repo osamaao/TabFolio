@@ -1,11 +1,12 @@
 # Changelog
 
-## [Unreleased] — TabFolio 3.0.0
+## [Unreleased]
 
-Reviewed on October 13, 2026 against remote `main` at
+## [3.0.0] - 2026-10-13
+
+Changes since version `2.0` at
 [`3cb90dc`](https://github.com/osamaao/TabFolio/commit/3cb90dc487c56a05619bd5a3c4982bbdb87e1989)
-(manifest version `2.0`). This entry covers the implemented changes on
-`features-update`.
+in the previous `main` implementation.
 
 ### Added — Tab control panel
 
@@ -157,10 +158,13 @@ Reviewed on October 13, 2026 against remote `main` at
 
 - Extension version is now **3.0.0**; minimum Chrome version increases from
   **90 to 116**. Snapshot/export schema version is **2**.
-- Verified for this changelog: **108 automated tests passed**;
+- Release checks: **108 automated tests passed**;
   `npm run check` passed syntax, manifest, asset, CSP, and form-label checks.
 - Live Chrome interaction and visual validation remain pending, as recorded in
   [VALIDATION.md](VALIDATION.md).
 - Recovery saves URLs and layout, not page contents, form edits, login state,
   navigation history, or window geometry. Legacy snapshots cannot recover data
   they never captured. Old warning symbols in page titles may remain until reload.
+
+[Unreleased]: https://github.com/osamaao/TabFolio/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/osamaao/TabFolio/releases/tag/v3.0.0

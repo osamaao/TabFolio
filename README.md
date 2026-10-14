@@ -3,9 +3,9 @@
 A Chrome side panel for finding and organizing tabs, protecting your own groups,
 reviewing duplicates, and restoring saved window layouts.
 
-## What's new in 3.0.0 (unreleased)
+## What's new in 3.0.0
 
-The current development version adds these features and improvements over version 2:
+Version 3.0.0 adds these features and improvements over version 2:
 
 - **Searchable side panel:** find tabs by title, URL or group name in the current
   window or across all windows. Open it from the toolbar, page context menu or
@@ -53,16 +53,20 @@ The current development version adds these features and improvements over versio
   private browsing data from snapshots, duplicate review and durable preferences.
 
 Version 3 requires **Chrome 116 or newer**. See [CHANGELOG.md](CHANGELOG.md) for
-the complete changes against remote `main`, and [VALIDATION.md](VALIDATION.md)
+the complete release log, and [VALIDATION.md](VALIDATION.md)
 for automated coverage and pending live Chrome checks.
 
 ## Install or update
 
 Requires **Chrome 116 or newer**. No build step is needed to run the extension.
 
+Download and extract `tabfolio-v3.0.0.zip` from the
+[v3.0.0 release](https://github.com/osamaao/TabFolio/releases/tag/v3.0.0), or clone
+this repository.
+
 1. Open `chrome://extensions` and enable **Developer mode**.
-2. Select **Load unpacked** and choose this repository. For an existing install,
-   click **Reload** on TabFolio's card.
+2. Select **Load unpacked** and choose the extracted release folder or this
+   repository. For an existing install, click **Reload** on TabFolio's card.
 3. Pin TabFolio in Chrome's toolbar and click it to open the side panel.
 
 Version 3 replaces the settings popup with a side panel. Settings are available
